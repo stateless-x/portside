@@ -243,14 +243,31 @@ Drag region (`-webkit-app-region: drag`) holding the panel title, a live server 
 
 ### Rows
 - **Shape:** 7px radius, 1px `--border`, `--bg-raised` fill; border darkens to `--label-3` on hover.
-- **Anatomy:** a leading monospace port cell, a title, a health indicator (dot + word), uptime, an optional "unattended" hint, an optional network badge, an optional "kept" tag — then a hover-revealed action cluster (expand chevron, optional "go to source," the "Keep running" checkbox, Stop). At the panel's fixed 380px, the fullest version of this row — multi-port, go-to-source present, all four controls — fits on one line with the action cluster at 157px and no wrap.
+- **Anatomy:** a leading monospace port cell, a title, a health indicator (dot + word), uptime, an optional "unattended" hint, an optional network badge, an optional resource-pressure badge, an optional "kept" tag — then a hover-revealed action cluster (expand chevron, optional "go to source," the "Keep running" checkbox, Stop). At the panel's fixed 380px, the fullest version of this row — multi-port, go-to-source present, all four controls — fits on one line with the action cluster at 157px and no wrap. The meta line itself wraps (`flex-wrap`), which is what absorbs the widest real case: network badge + "High CPU and memory" + "kept" on one row, verified at 380px with no horizontal overflow.
+- **Resource figures** ("5.3% CPU  148 MB") appear only inside an expanded row or in Stats mode — never on the friendly row, where ordinary usage would be noise. The row builders simply do not create the line otherwise, so it needs no visibility rule.
 - **not_responding state:** the row tints (`--danger-tint` fill, `--danger-border` outline) and the health word/dot turn `--danger`. Unmistakable but native — a tint and red text, no rotation, no displacement. This is the direct rejection of the former "cocked strip" treatment.
-- **is-kept state:** the row's fill drops to `--bg` (the panel's own recessed ground) and meta text, title, watch-reason, the "kept" tag, and the action icons recede to `--label-3` — see the Recede-By-Element-Color Rule. The health word and network badge hold full strength. Hovering a kept row restores `--bg-raised` and full-strength title color. A small "kept" tag sits on the meta line so the fade states its own reason: a receded row with no explanation reads as broken rather than deliberate, and the explanation must not depend on hovering the control that caused it.
-- **Watch-only rows** carry no action slot at all — not a disabled button, no reserved space for one. The only control is the expand chevron. They also never render a "go to source" action, since a `WatchOnlyServer` carries no project path.
+- **is-kept state:** the row's fill drops to `--bg` (the panel's own recessed ground) and meta text, title, watch-reason, the "kept" tag, and the action icons recede to `--label-3` — see the Recede-By-Element-Color Rule. The health word, the network badge and the resource-pressure badge hold full strength. Keeping the pressure badge bright on a kept row is deliberate: the mark says the user meant to leave the server on, which is not a statement that what it consumes stopped mattering. Hovering a kept row restores `--bg-raised` and full-strength title color. A small "kept" tag sits on the meta line so the fade states its own reason: a receded row with no explanation reads as broken rather than deliberate, and the explanation must not depend on hovering the control that caused it.
+- **Watch-only rows** carry no action slot at all — not a disabled button, no reserved space for one. The only control is the expand chevron. They also never render a "go to source" action, since a `WatchOnlyServer` carries no project path. Portside's own process, when it holds a port (i.e. under `tauri dev`), appears here as "Portside — this app": shown honestly rather than hidden, and never stoppable.
+- **Row titles** share typography and truncation, but only the dev-server title is interactive — it is a real `<button>` that discloses the full process name. Watch Only and Other titles are plain spans and carry no pointer cursor, hover underline or focus treatment, because there is nothing behind them to click.
 - **Dev rows only** offer "go to source" (the folder-open icon), and only when `server.projectPath` is non-null — an action that would open nothing is treated as a lie the panel must not tell.
 
 ### Network badge
 A transparent hairline chip: `--caution` text, 1px `--caution-border`, no fill. Rendered once per row even when several ports are exposed, because the fact the user acts on is that the server is reachable at all, not how many addresses carry that exposure. See the Beige Is the Anti-Reference Rule.
+
+### Resource-pressure badge
+The same hairline-chip construction and the same `--caution` vocabulary as the network badge, and for the same reason: both are things to notice, neither is a thing that is wrong. It reads "High CPU," "High memory," or "High CPU and memory" — words, never a coloured dot, so it survives high contrast and reaches a screen reader intact, exactly as the health word does.
+
+Deliberately **not** `--danger`. A server working hard is working. Red would push the user to act on a fact the panel itself never acts on: the badge is observational, it never appears because Portside decided something, and nothing about stopping changes when it is present. It carries no icon — the words are the whole affordance, and a second glyph beside the network badge's would read as two warnings rather than one.
+
+It appears only on *sustained* elevation, which is a backend verdict (see docs/IPC.md v1.4), never derived in the UI from a single figure. That is what stops a compile from flashing a warning at someone: CPU must stay high for 30 seconds and memory for 10, and the CPU threshold scales with the machine's core count. The tooltip states those durations exactly ("CPU usage stayed high for at least 30 seconds.") rather than saying "the last few scans" — the scan cadence varies between 3s and 60s, so a count of scans is not a length of time.
+
+### CPU figures
+Two presentations of one measurement, chosen by who is reading.
+
+- **Expanded rows and Stats mode** keep Activity Monitor's convention: 100% is one fully used core, so a multi-core process reads "276% CPU". This is the number a developer can compare directly against Activity Monitor, and it is what the wire carries. Above one core the figure's tooltip explains it ("100% equals one CPU core. 276% is about 2.8 cores.").
+- **The Quick read** translates to a share of the whole Mac — "about 28% of this Mac's CPU" — because that summary answers "should I worry", and 276% reads alarming until you know the machine has ten cores. The core count comes from `navigator.hardwareConcurrency`; when it is unavailable the raw wording is used instead, rather than the panel inventing a denominator.
+
+Memory is presented one way everywhere: binary units, MB/GB labels.
 
 ### Buttons
 - **Icon buttons** (expand, go-to-source, Refresh, Stats, Stop): 22×22px, 5px radius, transparent at rest, `--bg-hover`/`--bg-active` on interaction. Stop additionally carries `.is-danger`, hovering to `--danger-tint` fill and `--danger` text/icon.
@@ -301,8 +318,9 @@ A single transient `--bg-raised` card, bottom-anchored, `--shadow-popover`, auto
 ### Do:
 - **Do** ship the health word next to the dot always — color is never the only carrier of status.
 - **Do** recede a row by naming individual elements (`--label-3`), never by setting `opacity` on the row container (The Recede-By-Element-Color Rule).
-- **Do** keep `.health`'s word and `.badge-network` at full strength under every recede state, in both modes.
-- **Do** render the network badge as a transparent hairline chip on the row's own ground, never a filled tint.
+- **Do** keep `.health`'s word, `.badge-network` and `.badge-pressure` at full strength under every recede state, in both modes.
+- **Do** render the network and resource-pressure badges as transparent hairline chips on the row's own ground, never a filled tint.
+- **Do** put the words in the resource-pressure badge ("High CPU"), and keep it `--caution` — never `--danger`, which would read as a demand to act on something Portside itself never acts on.
 - **Do** make Cancel the rightmost, accent-filled default button in every confirmation dialog, and the destructive action bordered and never rightmost (The Cancel-Is-Default Rule).
 - **Do** confine monospace to port numbers, the nerd grid, telemetry, and the source-menu path; everything else is system sans, sentence case.
 - **Do** author light and dark as two first-class renditions, both verified ≥4.5:1 on their real composited grounds.

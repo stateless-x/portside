@@ -11,9 +11,9 @@
 // calls and trigger a re-render.
 
 import { icon } from "./icons.js";
-import { emptyStateSlot } from "./pages.js";
+import { emptyStateSlot, friendlyGuideSlot } from "./pages.js";
 
-/** @type {Map<string, {stopPending?: boolean, forceEligible?: boolean, stillRunningMessage?: string, keepRunningPending?: boolean, expanded?: boolean}>} */
+/** @type {Map<string, {stopPending?: boolean, forceEligible?: boolean, stillRunningMessage?: string, keepRunningPending?: boolean, expanded?: boolean, showName?: boolean}>} */
 export const rowState = new Map();
 
 function stateFor(id) {
@@ -68,6 +68,216 @@ function el(tag, className, text) {
   if (className) node.className = className;
   if (text !== undefined) node.textContent = text;
   return node;
+}
+
+// ---------- Resource usage (docs/IPC.md v1.4) ----------
+
+/** Every place the panel explains what a CPU or memory figure covers. One constant,
+ * because the scope is the honest part: the number is for the listed process alone,
+ * and a user who assumes it includes the worker processes their dev server spawned
+ * would read it as much lower than the machine's real load. */
+export const RESOURCE_SCOPE_NOTE =
+  "Measured for this process at the latest scan. Related child processes are not included.";
+
+/** How many logical CPUs this Mac has, or null when the browser will not say.
+ *
+ * Read ONCE at module load, not per render: it cannot change while the panel is open,
+ * and it is only ever used to translate a figure the backend already measured.
+ * `hardwareConcurrency` is absent in some webviews and can report 0, both of which
+ * must degrade to "don't translate" rather than to a division by zero. */
+const LOGICAL_CPUS = (() => {
+  const n = navigator.hardwareConcurrency;
+  return Number.isFinite(n) && n > 0 ? n : null;
+})();
+
+/** "3% CPU", "82% CPU", "276% CPU" — Activity Monitor's convention, where 100% is one
+ * fully used core, so a process on several cores exceeds 100%. Kept raw on purpose:
+ * this is the number a developer can compare against Activity Monitor directly.
+ *
+ * Whole percent below 10 gets one decimal, because the difference between 0.4% and 3%
+ * is the difference between "asleep" and "working", while the difference between 82%
+ * and 82.4% is noise. Null is "not available" — never 0%, which would be a measurement
+ * the tool did not make. */
+function formatCpu(cpuPercent) {
+  if (cpuPercent === null || cpuPercent === undefined) return null;
+  const rounded = cpuPercent < 10 ? Math.round(cpuPercent * 10) / 10 : Math.round(cpuPercent);
+  return `${rounded}% CPU`;
+}
+
+/** The sentence that makes a >100% reading make sense, e.g. "100% equals one CPU core.
+ * 276% is about 2.8 cores." Only worth saying when the figure actually exceeds one
+ * core — below that it explains nothing the number did not already say. */
+function cpuCoresNote(cpuPercent) {
+  if (cpuPercent === null || cpuPercent === undefined || cpuPercent <= 100) return null;
+  const cores = Math.round((cpuPercent / 100) * 10) / 10;
+  return `100% equals one CPU core. ${Math.round(cpuPercent)}% is about ${cores} cores.`;
+}
+
+/** The same measurement as a share of the WHOLE machine: 276% on a 10-core Mac is 28%
+ * of everything it has.
+ *
+ * This is the figure for the Quick read, where the reader is asking "is this a problem"
+ * rather than "what does Activity Monitor say" — 276% reads alarming until you know how
+ * many cores there are, and 28% answers the question directly. Returns null when the
+ * core count is unavailable, so the caller falls back to the raw wording rather than
+ * inventing a denominator. */
+function cpuShareOfMachine(cpuPercent) {
+  if (cpuPercent === null || cpuPercent === undefined || !LOGICAL_CPUS) return null;
+  return Math.round(cpuPercent / LOGICAL_CPUS);
+}
+
+/** "84 MB", "1.2 GB". Binary divisors throughout (1024, not 1000) — this is memory,
+ * and it is what every other tool on the Mac showing a resident set reports. The
+ * labels stay MB/GB rather than MiB/GiB deliberately: CONTEXT.md's rule is that the
+ * plain word wins, and the audience reads MB. Null is "not available". */
+function formatMemory(memoryBytes) {
+  if (memoryBytes === null || memoryBytes === undefined) return null;
+  const KB = 1024;
+  const MB = KB * 1024;
+  const GB = MB * 1024;
+  // Round FIRST, then decide the unit. Picking the tier from the raw value and
+  // rounding inside it lets a figure just under a boundary round up past it and print
+  // in the smaller unit — 1 GiB minus one byte became "1024 MB", which is not a size
+  // anyone writes. Each tier is therefore only used while its own rounded value still
+  // fits below the next boundary.
+  const rounded = (value, decimals) => {
+    const factor = 10 ** decimals;
+    return Math.round(value * factor) / factor;
+  };
+  // One decimal at GB scale: 1.2 GB and 1.9 GB are meaningfully different sizes, and
+  // rounding both to "2 GB" would throw away the distinction the user reads.
+  if (rounded(memoryBytes / GB, 1) >= 1) return `${rounded(memoryBytes / GB, 1)} GB`;
+  if (rounded(memoryBytes / MB, 0) >= 1) return `${rounded(memoryBytes / MB, 0)} MB`;
+  if (rounded(memoryBytes / KB, 0) >= 1) return `${rounded(memoryBytes / KB, 0)} KB`;
+  return `${memoryBytes} B`;
+}
+
+/** The words for a sustained-pressure badge, or null when nothing is elevated.
+ * Words, never colour alone — the same rule as the health dot's word. */
+function pressureWords(pressure) {
+  if (pressure === "cpu") return "High CPU";
+  if (pressure === "memory") return "High memory";
+  if (pressure === "both") return "High CPU and memory";
+  return null;
+}
+
+/** The amber pressure badge, or null on a normal row.
+ *
+ * Caution vocabulary, never danger red: high usage is something to notice, not
+ * something wrong. It is observational only — nothing about this badge changes what
+ * stopping the Server does, and Portside never acts on it.
+ *
+ * Deliberately NOT hidden on a kept row: the user marked the Server to be left alone,
+ * which does not make what it is consuming irrelevant. (`.is-kept`'s recede names each
+ * receding element individually, so this badge holds full strength without needing an
+ * exemption — see the Recede-By-Element-Color Rule in DESIGN.md.) */
+function buildPressureBadge(usage) {
+  const words = pressureWords(usage?.pressure);
+  if (!words) return null;
+  const badge = el("span", "badge-pressure");
+  badge.appendChild(el("span", null, words));
+  // States the actual duration rather than "the last few scans": the cadence varies
+  // (3s open, 15s closed, 60s idle), so a count of scans is not a length of time and
+  // saying it that way would be vague where the rule is exact.
+  const held =
+    usage.pressure === "cpu"
+      ? "CPU usage stayed high for at least 30 seconds."
+      : usage.pressure === "memory"
+        ? "Memory usage stayed high for at least 10 seconds."
+        : "CPU usage stayed high for at least 30 seconds, and memory for at least 10 seconds.";
+  badge.title = `${held} ${RESOURCE_SCOPE_NOTE}`;
+  return badge;
+}
+
+/** The Quick read's usage sentence, in the reader's terms rather than Activity
+ * Monitor's.
+ *
+ * CPU is stated as a share of the whole Mac ("about 28% of this Mac's CPU"), because
+ * the question the summary answers is "should I worry", and a raw 276% reads alarming
+ * until you know the machine has ten cores. When the core count is unavailable the raw
+ * figure is used instead — a slightly harder number to read is better than a
+ * denominator the panel guessed.
+ *
+ * Exported so main.js can rebuild exactly this string from a resources:changed sample
+ * without re-rendering the list. */
+export function quickReadUsageSentence(usage) {
+  const share = cpuShareOfMachine(usage?.cpuPercent);
+  const cpu = share !== null ? `about ${share}% of this Mac's CPU` : formatCpu(usage?.cpuPercent);
+  const memory = formatMemory(usage?.memoryBytes);
+  const figure =
+    usage?.pressure === "memory"
+      ? memory
+      : usage?.pressure === "both"
+        ? [cpu, memory].filter(Boolean).join(" and ")
+        : cpu;
+  return figure
+    ? `It is using ${figure} right now. Portside will not stop it automatically.`
+    : "It has been running heavy for a while. Portside will not stop it automatically.";
+}
+
+/** The exact-figures line: visible only when the row is expanded or Stats mode is on
+ * (docs/IPC.md v1.4 / the product rule that normal usage adds nothing to the friendly
+ * row). Every row type gets one, including rows whose figures are unavailable — an
+ * absent line and an unmeasurable metric would otherwise look identical.
+ *
+ * The `data-resource` hooks are what `updateResources` patches in place, so a fresh
+ * reading never costs a list rebuild. */
+function buildResourceLine(usage) {
+  const line = el("div", "resource-line");
+  line.title = RESOURCE_SCOPE_NOTE;
+
+  const cpu = el("span", "resource-figure");
+  cpu.dataset.resource = "cpu";
+  cpu.textContent = formatCpu(usage?.cpuPercent) ?? "CPU not available";
+  // Only present above one core, where the raw number needs explaining. Attached as a
+  // tooltip on the figure itself rather than as visible text, so the dense line stays
+  // dense — the explanation is there for the reader who stops on the number.
+  const cores = cpuCoresNote(usage?.cpuPercent);
+  cpu.title = cores ? `${cores} ${RESOURCE_SCOPE_NOTE}` : RESOURCE_SCOPE_NOTE;
+
+  const memory = el("span", "resource-figure");
+  memory.dataset.resource = "memory";
+  memory.textContent = formatMemory(usage?.memoryBytes) ?? "memory not available";
+
+  line.appendChild(cpu);
+  line.appendChild(memory);
+  return line;
+}
+
+/** Apply fresh figures to rows already on screen (docs/IPC.md v1.4
+ * `resources:changed`).
+ *
+ * Patches text nodes ONLY. It never adds, removes or reorders a row, and never
+ * touches the badge — a badge appearing means the sustained PRESSURE verdict changed,
+ * which arrives as `servers:changed` and gets a normal rebuild. That division is the
+ * whole reason this function exists: a rebuild every few seconds would close open
+ * disclosures, drop the user's hover and reset scroll, several times a minute.
+ *
+ * @param {import('./mock.js').ResourceSamples} samples
+ * @param {HTMLElement} root
+ */
+export function updateResources(samples, root) {
+  for (const sample of samples.samples ?? []) {
+    // CSS.escape: an id is backend-issued ("1234:4399") and goes into a selector.
+    const escaped = CSS.escape(sample.id);
+    const row = root.querySelector(`[data-id="${escaped}"]`);
+    if (row) {
+      const cpu = row.querySelector('[data-resource="cpu"]');
+      if (cpu) {
+        cpu.textContent = formatCpu(sample.usage?.cpuPercent) ?? "CPU not available";
+        const cores = cpuCoresNote(sample.usage?.cpuPercent);
+        cpu.title = cores ? `${cores} ${RESOURCE_SCOPE_NOTE}` : RESOURCE_SCOPE_NOTE;
+      }
+      const memory = row.querySelector('[data-resource="memory"]');
+      if (memory) memory.textContent = formatMemory(sample.usage?.memoryBytes) ?? "memory not available";
+    }
+
+    // The Quick read quotes a live figure for one specific server. Matching on the id
+    // is what keeps it honest: a sample for any OTHER row leaves the summary alone
+    // rather than rewriting it with a figure that belongs to something else.
+    const summary = root.querySelector(`[data-resource-summary="${escaped}"]`);
+    if (summary) summary.textContent = quickReadUsageSentence(sample.usage);
+  }
 }
 
 function iconButton(name, { label, danger = false, size = 13 } = {}) {
@@ -219,12 +429,24 @@ function buildServerRow(projectName, server, handlers, onToggleExpand) {
   const headline = el("div", "row-headline");
   headline.appendChild(buildPort(server.ports));
   const hasTitle = Boolean(server.title);
-  const title = el(
-    "span",
-    "row-title" + (hasTitle ? "" : " is-command"),
-    server.title || server.command,
+  // A long process name is useful context, not an advanced-only detail. Making
+  // the visible (possibly ellipsised) name a small disclosure keeps the list
+  // scannable while giving every user a clear way to read it in full.
+  const title = document.createElement("button");
+  title.type = "button";
+  title.className = "row-title" + (hasTitle ? "" : " is-command");
+  title.textContent = server.title || server.command;
+  const state = stateFor(server.id);
+  title.title = state.showName ? "Hide full process name" : "Show full process name";
+  title.setAttribute("aria-expanded", String(Boolean(state.showName)));
+  title.setAttribute(
+    "aria-label",
+    `${state.showName ? "Hide" : "Show"} full process name: ${server.title || server.command}`,
   );
-  title.title = server.title || server.command;
+  title.addEventListener("click", () => {
+    state.showName = !state.showName;
+    onToggleExpand();
+  });
   headline.appendChild(title);
   body.appendChild(headline);
 
@@ -242,6 +464,11 @@ function buildServerRow(projectName, server, handlers, onToggleExpand) {
   const network = buildNetworkBadge(server.ports);
   if (network) meta.appendChild(network);
 
+  // Sustained high usage only. Normal usage adds nothing to the friendly row — its
+  // figures live in the details below, and in Stats mode.
+  const pressure = buildPressureBadge(server.usage);
+  if (pressure) meta.appendChild(pressure);
+
   if (server.keepRunning) {
     // The row recedes when kept, and a faded row with no stated reason reads as
     // broken rather than as deliberate. This names the reason in the row itself, so
@@ -253,8 +480,12 @@ function buildServerRow(projectName, server, handlers, onToggleExpand) {
 
   body.appendChild(meta);
 
-  const state = stateFor(server.id);
+  if (state.showName) {
+    body.appendChild(el("div", "full-process-name", server.title || server.command));
+  }
+
   if (nerdMode || state.expanded) {
+    body.appendChild(buildResourceLine(server.usage));
     body.appendChild(
       buildNerds([
         ["pid", String(server.pid)],
@@ -266,6 +497,7 @@ function buildServerRow(projectName, server, handlers, onToggleExpand) {
         ["health", server.health],
         ["unattended", String(server.unattended)],
         ["keep", String(server.keepRunning)],
+        ["pressure", server.usage?.pressure ?? "—"],
         ["id", server.id],
       ]),
     );
@@ -287,7 +519,7 @@ function buildServerRow(projectName, server, handlers, onToggleExpand) {
   const actions = el("div", "row-actions");
   // Controls are hover-revealed, but a row mid-stop or already expanded must
   // stay visible without a pointer resting on it.
-  if (state.stopPending || state.expanded) actions.classList.add("is-pinned");
+  if (state.stopPending || state.expanded || state.showName) actions.classList.add("is-pinned");
 
   actions.appendChild(
     buildExpandButton(server.id, Boolean(state.expanded), onToggleExpand),
@@ -374,17 +606,25 @@ function buildWatchOnlyRow(server, onToggleExpand) {
   meta.appendChild(el("span", "meta-text", formatUptime(server.uptimeSeconds)));
   const network = buildNetworkBadge(server.ports);
   if (network) meta.appendChild(network);
+  // A Watch Only row carries the badge like any other: the user opened this panel
+  // partly to see that these are behaving, and "using a lot" is exactly the kind of
+  // thing they would want to know about something they cannot stop from here. It adds
+  // no control — this row still has no action slot at all.
+  const pressure = buildPressureBadge(server.usage);
+  if (pressure) meta.appendChild(pressure);
   body.appendChild(meta);
 
   const state = stateFor(server.id);
   if (nerdMode || state.expanded) {
     // Only what a WatchOnlyServer actually carries (docs/IPC.md) — no pid, no
     // command, no health: this type has none, and inventing them would be a lie.
+    body.appendChild(buildResourceLine(server.usage));
     body.appendChild(
       buildNerds([
         ["ports", portLines(server.ports)],
         ["uptime", `${server.uptimeSeconds}s`],
         ["reason", server.reason],
+        ["pressure", server.usage?.pressure ?? "—"],
         ["id", server.id],
       ]),
     );
@@ -428,6 +668,8 @@ function buildOtherRow(other, handlers, onToggleExpand) {
   );
   const network = buildNetworkBadge(other.ports);
   if (network) meta.appendChild(network);
+  const pressure = buildPressureBadge(other.usage);
+  if (pressure) meta.appendChild(pressure);
   body.appendChild(meta);
 
   if (other.guessedProject) {
@@ -448,11 +690,13 @@ function buildOtherRow(other, handlers, onToggleExpand) {
   if (nerdMode || state.expanded) {
     // An OtherServer carries no pid, uptime or health in docs/IPC.md — this is
     // everything the type has.
+    body.appendChild(buildResourceLine(other.usage));
     body.appendChild(
       buildNerds([
         ["ports", portLines(other.ports)],
         ["kind", other.kind],
         ["guess", other.guessedProject ?? "—"],
+        ["pressure", other.usage?.pressure ?? "—"],
         ["id", other.id],
       ]),
     );
@@ -527,6 +771,68 @@ function buildEmptyState(scanFailed) {
   return wrap;
 }
 
+/** Turns the scan into one calm, truthful sentence. It does not make a decision
+ * for the user or expose a destructive shortcut; its job is only to explain what
+ * deserves attention first. */
+function buildQuickRead(snapshot, totalDevServers) {
+  if (totalDevServers === 0) return null;
+
+  const wrap = el("aside", "quick-read");
+  wrap.setAttribute("aria-label", "Quick read of your servers");
+  wrap.appendChild(friendlyGuideSlot());
+  const copy = el("div", "quick-read-copy");
+  copy.appendChild(el("div", "quick-read-label", "Quick read"));
+
+  const servers = snapshot.projects.flatMap((group) => group.servers);
+  const notResponding = servers.find((server) => server.health === "not_responding");
+  // Sustained high usage ranks BELOW "not answering" — a server that has stopped
+  // responding is broken, while one working hard is merely working hard. A kept
+  // server is included: the user asked Portside not to nag them about it running,
+  // which is not the same as not wanting to know it is eating a core.
+  const heavy = servers.find((server) => server.usage && server.usage.pressure !== "normal");
+  const unattended = servers.find((server) => server.unattended && !server.keepRunning);
+  let title;
+  let body;
+  if (snapshot.scanFailed) {
+    title = "Showing the last good scan";
+    body = "Portside could not refresh just now. Try Refresh before making a decision.";
+  } else if (notResponding) {
+    title = `Port ${notResponding.ports[0]?.number ?? "—"} needs a look`;
+    body = "It is still held but is not answering. Check it first; Portside will never stop it automatically.";
+  } else if (heavy) {
+    const port = heavy.ports[0]?.number ?? "—";
+    const subject =
+      heavy.usage.pressure === "memory"
+        ? "a lot of memory"
+        : heavy.usage.pressure === "both"
+          ? "a lot of CPU and memory"
+          : "a lot of CPU";
+    title = `Port ${port} is using ${subject}`;
+    // The reassurance matters as much as the fact: a warning that does not say the
+    // tool will leave it alone reads as a prompt to act.
+    body = quickReadUsageSentence(heavy.usage);
+  } else if (unattended) {
+    title = "A server is running on its own";
+    body = "Its terminal or coding agent has closed. If you no longer need it, you can choose to stop it here.";
+  } else {
+    title = "Everything looks steady";
+    body = `${totalDevServers} development ${totalDevServers === 1 ? "server is" : "servers are"} running. Green means they are answering.`;
+  }
+  copy.appendChild(el("div", "quick-read-title", title));
+  const bodyEl = el("p", "quick-read-body", body);
+  if (heavy && !snapshot.scanFailed && !notResponding) {
+    // The one Quick read variant that quotes a live figure, so it is the one that goes
+    // stale between structural events. Tagging it with the server it describes lets
+    // updateResources rewrite this sentence in place — and ONLY when the sample it
+    // receives is for that same server, so a different row's reading can never rewrite
+    // someone else's summary.
+    bodyEl.dataset.resourceSummary = heavy.id;
+  }
+  copy.appendChild(bodyEl);
+  wrap.appendChild(copy);
+  return wrap;
+}
+
 function buildSectionHeader(title) {
   const header = el("div", "section-header");
   header.appendChild(el("span", "section-title", title));
@@ -560,6 +866,9 @@ export function render(snapshot, root, handlers) {
 
   // ---- Development servers ----
   const devSection = el("section", "section");
+
+  const quickRead = buildQuickRead(snapshot, totalDevServers);
+  if (quickRead) devSection.appendChild(quickRead);
 
   const devHeader = buildSectionHeader("Development servers");
   if (totalDevServers > 0) {

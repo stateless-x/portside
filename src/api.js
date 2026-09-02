@@ -86,3 +86,20 @@ export function onServersChanged(handler) {
   }
   return mock.onServersChanged(handler);
 }
+
+/**
+ * docs/IPC.md v1.4: subscribes to resources:changed — fresh CPU/memory figures for
+ * rows already on screen. Deliberately a separate subscription from
+ * onServersChanged, matching the two separate events: this one carries no list
+ * structure and its handler must never rebuild the list.
+ * @param {(samples: import('./mock.js').ResourceSamples) => void} handler
+ */
+export function onResourcesChanged(handler) {
+  if (tauri) {
+    const unlistenPromise = tauri.event.listen("resources:changed", (event) => {
+      handler(event.payload);
+    });
+    return () => unlistenPromise.then((unlisten) => unlisten());
+  }
+  return mock.onResourcesChanged(handler);
+}

@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use portwatch_lib::domain::classify::classify_listener;
-use portwatch_lib::domain::model::{Kind, ProjectAttribution};
+use portwatch_lib::domain::model::{Kind, ProjectAttribution, SelfPids};
 use portwatch_lib::platform::{AddressFamily, PortBinding, Reachability, RawListener};
 
 /// A fake filesystem for `find_project`'s marker checks, built from the real
@@ -20,6 +20,11 @@ fn fake_fs(existing: &[&str]) -> impl Fn(&Path) -> bool {
     let set: HashSet<PathBuf> = existing.iter().map(PathBuf::from).collect();
     move |p: &Path| set.contains(p)
 }
+
+/// Pids that are deliberately not any listener's in these fixtures, so the self-guard
+/// (rule 0 in classify) never fires and they exercise the classification rules they
+/// were written for. The guard has its own dedicated tests in scanner.rs.
+const NOT_SELF_PID: SelfPids = SelfPids { own: 0, dev_parent: None };
 
 fn listener(pid: u32, exe_path: &str, cwd: Option<&str>, ports: Vec<PortBinding>) -> RawListener {
     RawListener {
@@ -31,6 +36,10 @@ fn listener(pid: u32, exe_path: &str, cwd: Option<&str>, ports: Vec<PortBinding>
         ports,
         start_time: SystemTime::now(),
         user: "purin".to_string(),
+        // Classification never consults resource usage — Kind is decided by path,
+        // cwd and ownership alone — so the default (both metrics absent) is the
+        // honest fixture value here rather than an invented figure.
+        usage: Default::default(),
     }
 }
 
@@ -87,7 +96,7 @@ fn same_port_different_address_families_are_two_distinct_dev_servers() {
         Some("/Users/purin/dev/purin-dev-site"),
         vec![localhost_v6(4399)],
     );
-    let (kind_a, attribution_a) = classify_listener(&raw_a, owning_app, purin_dev_site_fs);
+    let (kind_a, attribution_a) = classify_listener(&raw_a, NOT_SELF_PID, owning_app, purin_dev_site_fs);
     assert_eq!(kind_a, Kind::DevServer);
     match attribution_a {
         ProjectAttribution::Known(project, _) => assert_eq!(project.name, "purin-dev-site"),
@@ -104,7 +113,7 @@ fn same_port_different_address_families_are_two_distinct_dev_servers() {
         Some("/Users/purin/dev/vala-platform/apps/web"),
         vec![localhost_v4(4399)],
     );
-    let (kind_b, attribution_b) = classify_listener(&raw_b, owning_app, vala_fs);
+    let (kind_b, attribution_b) = classify_listener(&raw_b, NOT_SELF_PID, owning_app, vala_fs);
     assert_eq!(kind_b, Kind::DevServer);
     match attribution_b {
         ProjectAttribution::Known(project, package) => {
@@ -144,8 +153,8 @@ fn one_project_two_servers_resolve_to_the_same_project() {
         vec![localhost_v6(4321)],
     );
 
-    let (kind_a, attribution_a) = classify_listener(&raw_4399, owning_app, &exists);
-    let (kind_b, attribution_b) = classify_listener(&raw_4321, owning_app, &exists);
+    let (kind_a, attribution_a) = classify_listener(&raw_4399, NOT_SELF_PID, owning_app, &exists);
+    let (kind_b, attribution_b) = classify_listener(&raw_4321, NOT_SELF_PID, owning_app, &exists);
 
     assert_eq!(kind_a, Kind::DevServer);
     assert_eq!(kind_b, Kind::DevServer);
@@ -188,7 +197,7 @@ fn background_service_with_unrelated_cwd_is_never_a_dev_server() {
         ],
     );
 
-    let (kind, attribution) = classify_listener(&raw, owning_app, exists);
+    let (kind, attribution) = classify_listener(&raw, NOT_SELF_PID, owning_app, exists);
 
     assert_eq!(kind, Kind::BackgroundService);
     assert!(!kind.is_watch_only(), "BackgroundService must remain stoppable, not Watch Only");
@@ -213,7 +222,7 @@ fn no_project_markers_and_no_bundle_is_your_own_tool_and_watch_only() {
         vec![localhost_v4(18789), localhost_v6(18789)],
     );
 
-    let (kind, attribution) = classify_listener(&raw, owning_app, exists);
+    let (kind, attribution) = classify_listener(&raw, NOT_SELF_PID, owning_app, exists);
 
     assert_eq!(kind, Kind::YourOwnTool);
     assert!(kind.is_watch_only());
@@ -227,7 +236,7 @@ fn no_project_markers_and_no_bundle_is_your_own_tool_and_watch_only() {
 fn cwd_none_does_not_panic_and_is_never_a_dev_server() {
     let raw = listener(99999, "/opt/homebrew/bin/node", None, vec![localhost_v4(3000)]);
 
-    let (kind, attribution) = classify_listener(&raw, owning_app, |_p: &Path| true);
+    let (kind, attribution) = classify_listener(&raw, NOT_SELF_PID, owning_app, |_p: &Path| true);
 
     assert_eq!(attribution, ProjectAttribution::None);
     assert_ne!(kind, Kind::DevServer);
@@ -247,7 +256,7 @@ fn system_daemon_binding_all_interfaces_is_part_of_macos_not_background_service(
         vec![all_interfaces_v4(49152), all_interfaces_v6(63015), all_interfaces_v6(63016)],
     );
 
-    let (kind, attribution) = classify_listener(&raw, owning_app, |_p: &Path| false);
+    let (kind, attribution) = classify_listener(&raw, NOT_SELF_PID, owning_app, |_p: &Path| false);
 
     assert_eq!(kind, Kind::PartOfMacOS);
     assert!(kind.is_watch_only());
@@ -266,7 +275,7 @@ fn app_helper_process_is_part_of_app_not_background_service() {
         vec![localhost_v4(59142), localhost_v4(55151)],
     );
 
-    let (kind, attribution) = classify_listener(&raw, owning_app, |_p: &Path| false);
+    let (kind, attribution) = classify_listener(&raw, NOT_SELF_PID, owning_app, |_p: &Path| false);
 
     assert_eq!(kind, Kind::PartOfApp);
     assert!(!kind.is_watch_only());
@@ -305,7 +314,7 @@ fn extension_host_with_project_marker_cwd_is_part_of_app_not_dev_server() {
         vec![localhost_v4(50219)],
     );
 
-    let (kind, attribution) = classify_listener(&raw, owning_app, exists);
+    let (kind, attribution) = classify_listener(&raw, NOT_SELF_PID, owning_app, exists);
 
     assert_eq!(kind, Kind::PartOfApp, "must resolve via the bundle, not the bogus fallback Project");
     assert!(!kind.is_watch_only());

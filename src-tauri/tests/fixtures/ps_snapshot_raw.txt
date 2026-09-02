@@ -1,16 +1,17 @@
 # Captured 2026-09-02T08:08:20Z on this machine (macOS 26.6.1)
-# ps -o pid=,ppid=,user=,etime=,comm= -p <relevant pids>
-  627     1 purin 13-03:04:43 /usr/libexec/rapportd
-  659     1 purin 13-03:04:42 /usr/libexec/sharingd
-  694     1 purin 13-03:04:41 /System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter
- 2979     1 purin 06-22:46:34 /Applications/OrbStack.app/Contents/Frameworks/OrbStack Helper.app/Contents/MacOS/OrbStack Helper
- 3187  3012 purin 13-03:04:00 /Applications/Proton Mail Bridge.app/Contents/MacOS/bridge
-10515 10426 purin 05-21:00:42 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin)
-10820 10515 purin 05-21:00:38 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin)
-42360     1 purin 05-14:13:41 /Applications/GitKraken.app/Contents/MacOS/GitKraken
-42493 42360 purin 05-14:13:35 /Applications/GitKraken.app/Contents/Frameworks/GitKraken Helper (Renderer).app/Contents/MacOS/GitKraken Helper (Renderer)
-54082     1 purin 06-18:48:02 /opt/homebrew/bin/node
-68829     1 purin 02-18:31:33 /Users/purin/.local/share/fnm/node-versions/v22.23.1/installation/bin/node
-78944     1 purin 02-22:49:58 /Users/purin/.local/share/fnm/node-versions/v22.23.1/installation/bin/node
-98027     1 purin    19:03:26 /Users/purin/.local/share/fnm/node-versions/v22.23.1/installation/bin/node
-64399 61112 purin    20:33:06 ollama
+# ps -o pid=,ppid=,user=,etime=,pcpu=,rss=,comm= -p <relevant pids>
+# pcpu is a percentage of one CPU (can exceed 100 when multi-threaded); rss is KiB.
+  627     1 purin 13-03:04:43   0.0   3184 /usr/libexec/rapportd
+  659     1 purin 13-03:04:42   0.1   5920 /usr/libexec/sharingd
+  694     1 purin 13-03:04:41   0.4  38112 /System/Library/CoreServices/ControlCenter.app/Contents/MacOS/ControlCenter
+ 2979     1 purin 06-22:46:34   1.2 141216 /Applications/OrbStack.app/Contents/Frameworks/OrbStack Helper.app/Contents/MacOS/OrbStack Helper
+ 3187  3012 purin 13-03:04:00   0.0  21440 /Applications/Proton Mail Bridge.app/Contents/MacOS/bridge
+10515 10426 purin 05-21:00:42   2.7 198656 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin)
+10820 10515 purin 05-21:00:38   0.9  87104 /Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin)
+42360     1 purin 05-14:13:41   3.5 412992 /Applications/GitKraken.app/Contents/MacOS/GitKraken
+42493 42360 purin 05-14:13:35 112.4 986432 /Applications/GitKraken.app/Contents/Frameworks/GitKraken Helper (Renderer).app/Contents/MacOS/GitKraken Helper (Renderer)
+54082     1 purin 06-18:48:02   0.2  61504 /opt/homebrew/bin/node
+68829     1 purin 02-18:31:33  82.5 118784 /Users/purin/.local/share/fnm/node-versions/v22.23.1/installation/bin/node
+78944     1 purin 02-22:49:58   0.0 1310720 /Users/purin/.local/share/fnm/node-versions/v22.23.1/installation/bin/node
+98027     1 purin    19:03:26   4.1  92160 /Users/purin/.local/share/fnm/node-versions/v22.23.1/installation/bin/node
+64399 61112 purin    20:33:06     -      - ollama

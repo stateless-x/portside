@@ -8,11 +8,13 @@ import {
   forceStop,
   openProject,
   onServersChanged,
+  onResourcesChanged,
 } from "./api.js";
 import {
   render,
   renderServerCount,
   renderTelemetry,
+  updateResources,
   rowState,
   setNerdMode,
   isNerdMode,
@@ -294,6 +296,45 @@ function paint(snapshot) {
 
 function rerender() {
   if (latestSnapshot) paint(latestSnapshot);
+}
+
+// docs/IPC.md v1.4. The deliberate counterpart to paint(): resources:changed arrives
+// every couple of seconds, and running it through paint() would rebuild the list that
+// often — closing any open row, dropping the user's hover mid-click and resetting
+// scroll. So it patches the drawn text in place and touches nothing else.
+//
+// The cached snapshot is updated alongside the DOM, and that is not optional: the next
+// servers:changed or rerender() (a nerd-mode toggle, an expand click) repaints from
+// latestSnapshot, and without this the fresh figures would visibly snap back to
+// whatever the last structural event carried.
+function applyResources(samples) {
+  if (latestSnapshot) {
+    const byId = new Map((samples.samples ?? []).map((s) => [s.id, s.usage]));
+    const everyRow = [
+      ...latestSnapshot.projects.flatMap((g) => g.servers),
+      ...latestSnapshot.watchOnly,
+      ...latestSnapshot.others,
+    ];
+    for (const row of everyRow) {
+      const usage = byId.get(row.id);
+      if (usage) row.usage = usage;
+    }
+    // The scan that produced these figures is the most recent one that happened, so
+    // the cached snapshot's timestamp is now out of date. Without this the Stats
+    // footer would keep showing the last STRUCTURAL scan's time while live numbers
+    // moved beside it — a clock that says one thing while the data says another.
+    if (samples.scannedAt) latestSnapshot.scannedAt = samples.scannedAt;
+  }
+  // Only the list view holds resource nodes; while a page is open there is nothing
+  // on screen to patch, and the cached snapshot above already carries the values for
+  // when the user comes back.
+  if (view === "list") {
+    updateResources(samples, listView);
+    // In place, like everything else here: renderTelemetry only rewrites the footer's
+    // own text and never touches the list, so the open rows, hover and scroll the rest
+    // of this function protects are unaffected.
+    if (latestSnapshot) renderTelemetry(latestSnapshot, telemetry);
+  }
 }
 
 // A stopped row simply stops being in the next snapshot, and the list redraws
@@ -821,6 +862,9 @@ async function boot() {
   });
 
   onServersChanged((snapshot) => paint(snapshot));
+  // Separate subscription for the separate event (docs/IPC.md v1.4) — see
+  // applyResources for why this must not go through paint().
+  onResourcesChanged((samples) => applyResources(samples));
 
   // servers:changed is push-only; refresh_now() is the only pull command, so
   // the initial paint has no choice but to call it (it also refetches titles —

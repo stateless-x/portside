@@ -5,7 +5,7 @@ use std::path::Path;
 
 use crate::platform::{PortBinding, RawListener};
 
-use super::model::{Kind, ProjectAttribution, Reachability};
+use super::model::{Kind, ProjectAttribution, Reachability, SelfPids};
 
 /// Executable path prefixes that belong to the operating system itself, never to
 /// something the user runs on purpose or a project they wrote. These are OS
@@ -20,9 +20,20 @@ use super::model::{Kind, ProjectAttribution, Reachability};
 /// for a Server that plainly belongs to a Project.
 const SYSTEM_EXE_PREFIXES: [&str; 4] = ["/System", "/usr/libexec", "/usr/sbin", "/sbin"];
 
+/// The label Portside's own process is shown under when it appears in its own list.
+/// A name, not a command or a bundle id, because it is the one row where the user
+/// already knows exactly what the program is.
+pub const SELF_LABEL: &str = "Portside — this app";
+
 /// Assign exactly one Kind to a Server, following CONTEXT.md's "Kind" section.
 ///
 /// Order matters and is load-bearing, not cosmetic:
+/// 0. THIS process -> YourOwnTool, hence Watch Only. Handled by `classify_listener`
+///    before anything else, because a tool that can be asked to stop itself is a tool
+///    that can be asked to stop mid-stop, and no later rule would catch it: under
+///    `tauri dev` the app's cwd is the project root, so every Project-derived rule
+///    would happily classify Portside as the user's own dev server, stoppable and
+///    swept up by Stop Everything.
 /// 1. System executable path -> PartOfMacOS. Checked first because some system
 ///    daemons (rapportd, ControlCenter, sharingd on this machine) also bind `*`,
 ///    which would otherwise be caught by rule 2.
@@ -112,11 +123,24 @@ fn attribution_for(kind: Kind, project: Option<(super::model::Project, Option<su
 /// get presented as the user's own server, stoppable and included in Stop Everything
 /// — see tests/domain_classify_fixtures.rs,
 /// `extension_host_with_project_marker_cwd_is_part_of_app_not_dev_server`.
-pub fn classify_listener<F, O>(raw: &RawListener, owning_app: O, exists: F) -> (Kind, ProjectAttribution)
+/// `self_pids` names the process ids that ARE this app — its own, plus (in a debug
+/// build) the `tauri dev` host that launched it and actually holds the port. Injected
+/// rather than read here because domain/ makes no OS calls (P1); scanner.rs resolves
+/// it. See rule 0 in `classify`: the check must come before every other rule.
+pub fn classify_listener<F, O>(raw: &RawListener, self_pids: SelfPids, owning_app: O, exists: F) -> (Kind, ProjectAttribution)
 where
     F: Fn(&Path) -> bool,
     O: Fn(&Path) -> Option<String>,
 {
+    if self_pids.covers(raw.pid) {
+        // Watch Only via YourOwnTool, which `Kind::is_watch_only()` already covers — so
+        // every stop path's existing guard refuses it without needing to learn about a
+        // new Kind. `ProjectAttribution::None` deliberately: the dev host's cwd is this
+        // repository, and reporting that as a Project would be the app claiming to
+        // serve the project it is merely running inside.
+        return (Kind::YourOwnTool, ProjectAttribution::None);
+    }
+
     let belongs_to = owning_app(&raw.exe_path);
     let project = raw.cwd.as_deref().and_then(|cwd| super::project::find_project(cwd, exists));
 

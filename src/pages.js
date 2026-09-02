@@ -104,6 +104,13 @@ export function emptyStateSlot() {
   return assetSlot("assets/empty-harbor.png", "", "asset-slot asset-slot-empty");
 }
 
+/** A small, decorative companion for the main list's plain-language summary.
+ * The words beside it carry the meaning; the illustration only makes the panel
+ * feel like a calm place to make a decision. */
+export function friendlyGuideSlot() {
+  return assetSlot("assets/lighthouse-mascot.png", "", "asset-slot asset-slot-guide");
+}
+
 /** The lighthouse mascot, shown small above the Settings footer. Expected asset:
  * src/assets/lighthouse-mascot.png, 320×320 @2x → 80×80 on screen. Decorative
  * (empty alt): the footer text beside it carries all the information. */
@@ -271,6 +278,14 @@ const WORDS = [
     "watch only",
     "Portside shows it but won't stop it. See below for why.",
   ],
+  [
+    "High CPU",
+    "It has worked hard for at least 30 seconds, not just for a moment. Often fine.",
+  ],
+  [
+    "High memory",
+    "It has held a lot of memory for at least 10 seconds. Often fine.",
+  ],
 ];
 
 /**
@@ -297,6 +312,15 @@ export function renderHelp(root, opts) {
     list.appendChild(el("dd", null, meaning));
   }
   root.appendChild(list);
+
+  root.appendChild(el("h3", "page-subhead", "CPU and memory"));
+  const resources = el("p", "page-text");
+  // The scope sentence is the honest part and comes last, where it lands: a user who
+  // assumes the figure covers the worker processes their dev server spawned would read
+  // it as far lower than the machine's real load.
+  resources.textContent =
+    "Expand a row, or turn on stats, to see what a server is using: CPU is how hard it is working right now, and memory is how much it is holding. CPU percentages follow Activity Monitor: 100% means one fully used CPU core, so a process using several cores can exceed 100%. Portside says nothing about ordinary usage. When one has been unusually heavy for a while — CPU for at least 30 seconds, memory for at least 10 — it adds a small amber note, so a brief burst of work never looks like a problem. It is only ever a note: Portside never stops a server because of what it is using. Both figures are measured for that one process at the latest scan, and do not include any other processes it started.";
+  root.appendChild(resources);
 
   root.appendChild(el("h3", "page-subhead", "Why some servers can't be stopped here"));
   const why = el("p", "page-text");

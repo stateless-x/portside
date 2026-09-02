@@ -627,6 +627,15 @@ pub fn emit_snapshot(app: &AppHandle, snapshot: &Snapshot) {
     }
 }
 
+/// docs/IPC.md v1.4 `resources:changed`. Deliberately does NOT touch the tray title:
+/// the tray reports how many dev servers are running and whether any stopped
+/// answering (F7), and resource usage is not a claim about either. F7 also says the
+/// indicator never claims a Server should be stopped — surfacing CPU there would come
+/// very close to exactly that.
+pub fn emit_resources(app: &AppHandle, samples: &crate::ipc::ResourceSamples) {
+    let _ = app.emit("resources:changed", samples);
+}
+
 impl ScannedServer {
     /// A cheap, explicit clone used only to release the scanner mutex before a
     /// multi-second stop wait. Named distinctly from `Clone::clone` (even though it
@@ -658,6 +667,7 @@ mod tests {
             health,
             unattended: true,
             keep_running: false,
+            usage: crate::ipc::ResourceUsageWire::new(&Default::default(), crate::scanner::Pressure::Normal),
         }
     }
 
@@ -714,6 +724,8 @@ mod tests {
             belongs_to: None,
             health: crate::scanner::Health::Responding,
             title: None,
+            usage: Default::default(),
+            pressure: crate::scanner::Pressure::Normal,
         }
     }
 
@@ -811,6 +823,7 @@ mod tests {
             ports: vec![binding(3000)],
             start_time: SystemTime::now(),
             user: "dev".into(),
+            usage: Default::default(),
         };
         let source = FakeSource { listeners: vec![still_listening], force_stop_called: std::sync::atomic::AtomicBool::new(false) };
         let state = empty_scanner_state();

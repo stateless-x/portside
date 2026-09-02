@@ -210,6 +210,7 @@ pub fn run() {
                     &deps,
                     &loop_waker,
                     |snapshot| commands::emit_snapshot(&app_handle, &snapshot),
+                    |samples| commands::emit_resources(&app_handle, &samples),
                     || false,
                 );
             });

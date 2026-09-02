@@ -94,3 +94,36 @@ pub enum Health {
     /// Not yet checked this cycle.
     Unknown,
 }
+
+/// Which process ids the app must never offer to stop, because they ARE the app.
+///
+/// Always Portside's own pid. In a debug build it also includes Portside's DIRECT
+/// parent, because that is where `tauri dev` actually holds the port.
+///
+/// The observed dev topology is a three-level chain, and the listener is not the app:
+///
+/// ```text
+///   npm run tauri dev   (pid 51521)
+///     └─ node …         (pid 51539)  <- HOLDS PORT 1430; Portside's direct parent
+///          └─ portside   (pid 43241)  <- std::process::id()
+/// ```
+///
+/// So `pid == std::process::id()` is false for the row the user actually sees, and the
+/// Tauri development host was still presented as a stoppable dev server — its cwd being
+/// the project root, every Project-derived rule classifies it as one. Stopping it kills
+/// the process tree Portside is running inside, mid-scan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SelfPids {
+    /// `std::process::id()`. Always guarded, in every build profile.
+    pub own: u32,
+    /// Portside's direct parent, guarded in debug builds only. `None` in release, and
+    /// `None` when the parent cannot be identified confidently.
+    pub dev_parent: Option<u32>,
+}
+
+impl SelfPids {
+    /// Whether this listener is Portside itself, or the dev host running it.
+    pub fn covers(&self, pid: u32) -> bool {
+        pid == self.own || self.dev_parent == Some(pid)
+    }
+}

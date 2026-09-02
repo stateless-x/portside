@@ -39,6 +39,34 @@ pub struct PortBinding {
     pub reachability: Reachability,
 }
 
+/// What one process was consuming at the moment it was scanned.
+///
+/// Both fields are `Option` because resource figures are *optional enrichment*: a
+/// figure the platform could not supply or could not parse makes that one metric
+/// unavailable, and never makes the listener itself disappear or the scan fail. N3
+/// again — "unavailable" and "zero" are different claims and must stay distinguishable.
+///
+/// **Measured for the listed process only.** No descendant or process-group
+/// aggregation: a process group can contain entirely unrelated processes (the same
+/// finding that narrowed `macos::signal_target` to the bare pid), so summing over one
+/// would attribute another program's usage to this Server.
+///
+/// `cpu_tenths_percent` is an integer (tenths of a percent, so `825` == 82.5%) rather
+/// than a float: every domain struct downstream derives `Eq`, and it is compared
+/// against thresholds and for change detection, neither of which a float supports
+/// honestly. It is NOT clamped to 1000 — `ps pcpu` legitimately exceeds 100% on a
+/// multi-core machine for a multi-threaded process, and clamping would under-report a
+/// real fact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ResourceSample {
+    /// Tenths of a percent of one CPU: `825` == 82.5%. `None` when unavailable.
+    pub cpu_tenths_percent: Option<u32>,
+    /// Resident set size in BYTES. `None` when unavailable. Platforms report this in
+    /// varying units (macOS `ps rss` is KiB) — the conversion happens at the platform
+    /// boundary so everything above this line deals in bytes only.
+    pub memory_bytes: Option<u64>,
+}
+
 /// A neutral description of one listening process, exactly as required by P1: no
 /// platform-specific fields, nothing domain logic couldn't have on any OS.
 ///
@@ -54,6 +82,8 @@ pub struct RawListener {
     pub ports: Vec<PortBinding>,
     pub start_time: SystemTime,
     pub user: String,
+    /// What this process was using at the latest scan (see `ResourceSample`).
+    pub usage: ResourceSample,
 }
 
 /// Platform boundary (P1). Every OS-specific fact the rest of the app needs comes

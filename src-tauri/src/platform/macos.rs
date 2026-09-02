@@ -9,9 +9,12 @@
 //!   address family; the address string alone does not (`*:5432` gives no family
 //!   clue by itself, only the bracket syntax `[::1]` does, and only when the host
 //!   isn't `*`).
-//! - `ps -o pid=,ppid=,user=,etime=,comm=` fills in the process metadata `lsof`
-//!   doesn't carry: parent pid, owning user, elapsed run time, and the full
-//!   executable path (macOS `ps comm` prints the path, not just a short name).
+//! - `ps -o pid=,ppid=,user=,etime=,pcpu=,rss=,comm=` fills in the process metadata
+//!   `lsof` doesn't carry: parent pid, owning user, elapsed run time, current CPU
+//!   percentage, resident memory, and the full executable path (macOS `ps comm`
+//!   prints the path, not just a short name). `comm` stays LAST because it may itself
+//!   contain spaces and is therefore parsed as "whatever remains" — any column added
+//!   after it would be unparseable.
 //! - `lsof -a -p <pids> -d cwd -F pn` looks up every enumerated pid's working
 //!   directory in one batched call, rather than one `lsof` spawn per pid.
 
@@ -20,7 +23,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{Duration, SystemTime};
 
-use super::{AddressFamily, PortBinding, ProcessSource, Reachability, RawListener};
+use super::{AddressFamily, PortBinding, ProcessSource, Reachability, RawListener, ResourceSample};
 
 pub struct MacosProcessSource;
 
@@ -58,6 +61,7 @@ impl ProcessSource for MacosProcessSource {
                 ports: socket.ports,
                 start_time: meta.start_time,
                 user: meta.user.clone(),
+                usage: meta.usage,
             });
         }
         Ok(listeners)
@@ -331,6 +335,7 @@ struct ProcessMeta {
     ppid: u32,
     user: String,
     start_time: SystemTime,
+    usage: ResourceSample,
     comm: String,
 }
 
@@ -342,7 +347,7 @@ fn run_ps_metadata(pids: &[u32]) -> Result<String, String> {
         .join(",");
 
     let output = Command::new("ps")
-        .args(["-o", "pid=,ppid=,user=,etime=,comm=", "-p", &pid_list])
+        .args(["-o", "pid=,ppid=,user=,etime=,pcpu=,rss=,comm=", "-p", &pid_list])
         .output()
         .map_err(|e| format!("failed to run ps: {e}"))?;
 
@@ -366,13 +371,14 @@ fn run_ps_metadata(pids: &[u32]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-/// Parse `ps -o pid=,ppid=,user=,etime=,comm=` output. The first four columns are
-/// separated by RUNS of spaces (column alignment, not single delimiters), so they
-/// must be split with `split_once(char::is_whitespace)` plus `trim_start` on the
-/// remainder, not `splitn` on individual whitespace chars — `splitn` would treat
+/// Parse `ps -o pid=,ppid=,user=,etime=,pcpu=,rss=,comm=` output. The first six
+/// columns are separated by RUNS of spaces (column alignment, not single delimiters),
+/// so they must be split with `split_once(char::is_whitespace)` plus `trim_start` on
+/// the remainder, not `splitn` on individual whitespace chars — `splitn` would treat
 /// each space in a run as its own empty field and every row would fail to parse.
 /// `comm` is whatever remains: the full executable path, which itself may contain
-/// spaces (e.g. "OrbStack Helper"), so it is taken as-is rather than split further.
+/// spaces (e.g. "OrbStack Helper"), so it is taken as-is rather than split further —
+/// which is also why `pcpu` and `rss` were inserted BEFORE it and not appended.
 fn parse_ps_output(raw: &str) -> BTreeMap<u32, ProcessMeta> {
     let mut result = BTreeMap::new();
     for line in raw.lines() {
@@ -397,6 +403,10 @@ fn parse_ps_line(trimmed: &str) -> Option<(u32, ProcessMeta)> {
     let (user, tail) = rest.split_once(char::is_whitespace)?;
     rest = tail.trim_start();
     let (etime_str, tail) = rest.split_once(char::is_whitespace)?;
+    rest = tail.trim_start();
+    let (pcpu_str, tail) = rest.split_once(char::is_whitespace)?;
+    rest = tail.trim_start();
+    let (rss_str, tail) = rest.split_once(char::is_whitespace)?;
     let comm = tail.trim_start();
 
     let pid = pid_str.parse::<u32>().ok()?;
@@ -405,6 +415,15 @@ fn parse_ps_line(trimmed: &str) -> Option<(u32, ProcessMeta)> {
     if comm.is_empty() {
         return None;
     }
+
+    // Resource figures are optional enrichment (`ResourceSample`): an unparseable
+    // one becomes `None` for that metric alone. Note the `?` above versus the `.ok()`
+    // here — pid/ppid/etime/comm failing means the ROW is not a process record and is
+    // dropped, but a bad pcpu or rss must never cost the user a visible Server.
+    let usage = ResourceSample {
+        cpu_tenths_percent: parse_pcpu_tenths(pcpu_str),
+        memory_bytes: parse_rss_kib_to_bytes(rss_str),
+    };
 
     let start_time = SystemTime::now()
         .checked_sub(elapsed)
@@ -416,9 +435,40 @@ fn parse_ps_line(trimmed: &str) -> Option<(u32, ProcessMeta)> {
             ppid,
             user: user.to_string(),
             start_time,
+            usage,
             comm: comm.to_string(),
         },
     ))
+}
+
+/// Parse macOS `ps pcpu` ("0.0", "82.5", "312.7" on a multi-core box) into TENTHS of
+/// a percent, so the whole pipeline downstream stays integer and `Eq`.
+///
+/// Parsed by splitting on the decimal point rather than via `f32`, deliberately: a
+/// float parse followed by a multiply-and-round reintroduces the float this codebase
+/// is avoiding, and `(82.5f32 * 10.0).round()` is a rounding decision hidden inside a
+/// cast. Values above 100% are kept as measured — a multi-threaded process genuinely
+/// using three cores is reported at 300%, and clamping would under-report a real fact.
+fn parse_pcpu_tenths(raw: &str) -> Option<u32> {
+    let (whole, fraction) = match raw.split_once('.') {
+        Some((w, f)) => (w, f),
+        None => (raw, "0"),
+    };
+    let whole: u32 = whole.parse().ok()?;
+    // `ps` prints exactly one decimal place; take the first digit and ignore any
+    // further precision rather than rejecting a format with more of it.
+    let tenths: u32 = fraction.chars().next()?.to_digit(10)?;
+    whole.checked_mul(10)?.checked_add(tenths)
+}
+
+/// Convert macOS `ps rss` — which is in KiB, not bytes — into bytes.
+///
+/// The conversion is explicit and separately testable because getting it wrong is
+/// invisible: a 1 GiB process reported as 1 GB-of-KiB would sail past the elevated
+/// threshold by a factor of 1024 and the badge would simply never appear, with nothing
+/// on screen looking broken.
+fn parse_rss_kib_to_bytes(raw: &str) -> Option<u64> {
+    raw.parse::<u64>().ok()?.checked_mul(1024)
 }
 
 /// Parse macOS `ps etime`, which comes in one of three shapes depending on how long
@@ -616,6 +666,81 @@ mod tests {
         assert_eq!(meta.len(), 14);
     }
 
+    // ---- resource enrichment: `ps` pcpu/rss, and the rule that a bad figure costs
+    // one metric rather than the whole Server ----
+
+    #[test]
+    fn parses_pcpu_into_tenths_of_a_percent() {
+        assert_eq!(parse_pcpu_tenths("0.0"), Some(0));
+        assert_eq!(parse_pcpu_tenths("3.0"), Some(30));
+        assert_eq!(parse_pcpu_tenths("82.5"), Some(825));
+        // No decimal point at all is still a valid reading.
+        assert_eq!(parse_pcpu_tenths("75"), Some(750));
+    }
+
+    /// `ps pcpu` exceeds 100 for a multi-threaded process on a multi-core machine.
+    /// That is a real measurement, not a parse error, and must not be clamped.
+    #[test]
+    fn parses_pcpu_above_one_hundred_percent_without_clamping() {
+        assert_eq!(parse_pcpu_tenths("112.4"), Some(1124));
+        assert_eq!(parse_pcpu_tenths("312.7"), Some(3127));
+    }
+
+    #[test]
+    fn rejects_unparseable_pcpu_rather_than_guessing_zero() {
+        // "-" is what the fixture's ollama row carries, and zero would be a fabricated
+        // measurement rather than an absent one (N3).
+        assert_eq!(parse_pcpu_tenths("-"), None);
+        assert_eq!(parse_pcpu_tenths(""), None);
+        assert_eq!(parse_pcpu_tenths("garbage"), None);
+    }
+
+    /// The conversion whose absence would be invisible: `ps rss` is KiB, and treating
+    /// it as bytes would put a 1 GiB process 1024x under the elevated threshold.
+    #[test]
+    fn converts_rss_from_kib_to_bytes() {
+        assert_eq!(parse_rss_kib_to_bytes("1"), Some(1024));
+        assert_eq!(parse_rss_kib_to_bytes("0"), Some(0));
+        // 1 GiB expressed the way ps reports it.
+        assert_eq!(parse_rss_kib_to_bytes("1048576"), Some(1024 * 1024 * 1024));
+        assert_eq!(parse_rss_kib_to_bytes("92160"), Some(94_371_840));
+    }
+
+    #[test]
+    fn rejects_unparseable_rss() {
+        assert_eq!(parse_rss_kib_to_bytes("-"), None);
+        assert_eq!(parse_rss_kib_to_bytes(""), None);
+        assert_eq!(parse_rss_kib_to_bytes("12.5"), None);
+    }
+
+    #[test]
+    fn parses_resource_columns_from_the_real_ps_fixture() {
+        let raw = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/ps_snapshot_raw.txt"
+        ))
+        .expect("fixture must exist");
+
+        let meta = parse_ps_output(&raw);
+
+        let busy = meta.get(&68829).expect("pid 68829 must parse");
+        assert_eq!(busy.usage.cpu_tenths_percent, Some(825));
+        assert_eq!(busy.usage.memory_bytes, Some(118_784 * 1024));
+
+        let hungry = meta.get(&78944).expect("pid 78944 must parse");
+        assert_eq!(hungry.usage.memory_bytes, Some(1_310_720 * 1024), "1.25 GiB resident");
+        assert_eq!(hungry.usage.cpu_tenths_percent, Some(0));
+
+        // Both figures unparseable ("-"): the metrics go absent but the process is
+        // still enumerated with its ppid/user/comm intact — the whole point of
+        // treating resource figures as optional enrichment.
+        let unmeasured = meta.get(&64399).expect("a process with unreadable metrics must still be listed");
+        assert_eq!(unmeasured.usage.cpu_tenths_percent, None);
+        assert_eq!(unmeasured.usage.memory_bytes, None);
+        assert_eq!(unmeasured.comm, "ollama");
+        assert_eq!(unmeasured.ppid, 61112);
+    }
+
     #[test]
     fn parses_real_cwd_batch_fixture() {
         let raw = std::fs::read_to_string(concat!(
@@ -713,6 +838,8 @@ mod identity_live_tests {
             belongs_to: None,
             health: Health::Unknown,
             title: None,
+            usage: super::ResourceSample::default(),
+            pressure: crate::scanner::Pressure::Normal,
         };
 
         let verdict = refuse_if_identity_changed(&second, &target);
