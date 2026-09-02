@@ -1,0 +1,57 @@
+=== cwd for ALL relevant pids (including background/system ones) ===
+--- pid 627 ---
+p627
+fcwd
+n/
+--- pid 659 ---
+p659
+fcwd
+n/
+--- pid 694 ---
+p694
+fcwd
+n/
+--- pid 2979 ---
+p2979
+fcwd
+n/Users/purin/dev/pawjai/pawjai-fe
+--- pid 3187 ---
+p3187
+fcwd
+n/
+--- pid 10515 ---
+p10515
+fcwd
+n/
+--- pid 10820 ---
+p10820
+fcwd
+n/Users/purin/.vscode/extensions/ms-python.vscode-pylance-2026.3.1/dist
+--- pid 42360 ---
+p42360
+fcwd
+n/
+--- pid 42493 ---
+p42493
+fcwd
+n/
+--- pid 54082 ---
+p54082
+fcwd
+n/Users/purin/.openclaw
+--- pid 64399 ---
+p64399
+fcwd
+n/Users/purin
+--- pid 68829 ---
+p68829
+fcwd
+n/Users/purin/dev/purin-dev-site
+--- pid 78944 ---
+p78944
+fcwd
+n/Users/purin/dev/purin-dev-site
+--- pid 98027 ---
+p98027
+fcwd
+n/Users/purin/dev/vala-platform/apps/web

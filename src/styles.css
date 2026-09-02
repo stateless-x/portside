@@ -1,0 +1,1266 @@
+/* Portside — macOS menu bar panel.
+
+   Played straight as a first-party Mac panel: system type, system grays, hairline
+   separators, quiet controls that surface on hover, one accent. The craft bar is
+   Apple's Control Center, Things 3, iStat Menus. Familiarity is the feature — the
+   user is in a task, and the tool should disappear into it.
+
+   Light and dark are both first-class renditions, not one inverted: a menu bar panel
+   that ignores system appearance looks broken.
+
+   ---------- Theme strategy (System / Light / Dark) ----------
+
+   Three token definitions, in this exact source order:
+
+     1. `:root`                                    — the complete LIGHT palette.
+     2. `@media (prefers-color-scheme: dark)
+          :root:not([data-theme="light"])`         — dark, when the OS says dark AND
+                                                     the user has not forced light.
+     3. `:root[data-theme="dark"]`                 — dark, forced.
+
+   System mode sets NO attribute, so rule 2 alone decides — which means the OS
+   appearance is honoured by CSS at first paint, with no JS involved and therefore
+   no flash of the wrong theme. The explicit modes set data-theme and win: "light"
+   is excluded from rule 2 by its :not(), and "dark" is picked up by rule 3.
+
+   Rules 2 and 3 compute to the SAME specificity (0,1,1 — one class-level attribute
+   selector plus one element), so their order is the tiebreak and rule 3 must stay
+   below rule 2. The two dark blocks are a matched pair: any token added to one goes
+   in the other, byte-identical, or an explicit Dark diverges from a system Dark. */
+
+:root {
+  /* Narrowed per explicit mode below. Kept as `light dark` here because System mode
+     must let the OS pick, including for the native-rendered controls (the Keep
+     running checkbox, scrollbars, focus surfaces) that read this and nothing else. */
+  color-scheme: light dark;
+
+  /* Two neutral layers: a slightly recessed panel ground, and raised content.
+     Light carries a hint of warmth (a red/green lead of a few points over blue)
+     rather than the pure neutral gray it started as — the panel should feel
+     approachable, not corporate. Warm AND a shade lighter, deliberately: warming
+     downward (#eeebe7) drops --label-3 on this ground to 4.96:1, under the floor,
+     while this direction lifts it to 5.05:1. The hue moved; the contrast improved.
+     Dark's neutrals are untouched — a warm dark ground reads as a color cast. */
+  --bg: #efedea;
+  --bg-raised: #fffefc;
+  --bg-chrome: #f4f2ef;
+  --bg-hover: rgba(0, 0, 0, 0.045);
+  --bg-active: rgba(0, 0, 0, 0.08);
+
+  --separator: rgba(0, 0, 0, 0.11);
+  --border: rgba(0, 0, 0, 0.13);
+
+  /* Label hierarchy, following the macOS primary/secondary/tertiary idea.
+     Secondary carries most repeated meta text, so it is held above 4.5:1. */
+  --label: #1d1d1f;
+  --label-2: #55565a;
+  /* Tertiary still has to clear 4.5:1 on every ground it lands on — the raised
+     card, the recessed kept row, and the title bar chrome — because it carries
+     the receded row's text and the nerd-grid labels, not just decoration. */
+  --label-3: #636469;
+
+  --accent: #0064d2;
+  --accent-fill: #0a71e0;
+  /* The accent as READING text on the panel ground. Deeper than --accent, which is
+     tuned for hairlines and focus rings and only reaches 4.79:1 as text here. */
+  --accent-text: #0a5bb8;
+  --on-accent: #ffffff;
+
+  --good: #1d7a44;
+  --unknown: #66676b;
+  /* Held dark enough to clear 4.5:1 as the "not responding" word on the tinted
+     row — which composites --danger-tint over --bg, not over the raised white. */
+  --danger: #b0241d;
+  --danger-hover: #a22019;
+  --danger-tint: rgba(192, 42, 34, 0.075);
+  --danger-border: rgba(192, 42, 34, 0.3);
+
+  /* Network exposure. Amber reads as caution without borrowing the danger red,
+     which belongs to "something is wrong". Drawn as a hairline chip on the row
+     ground: a filled amber patch was the last beige surface in the panel, and
+     beige is the anti-reference. */
+  --caution: #7a5300;
+  --caution-border: rgba(122, 83, 0, 0.45);
+
+  --shadow-popover: 0 6px 24px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.1);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.24);
+  --selection: rgba(10, 113, 224, 0.24);
+
+  /* Vibrancy grounds (real window only — see body.tauri below). Tokens rather than
+     literals in the body.tauri rules specifically so they follow the CHOSEN theme:
+     as hardcoded rgba() gated on prefers-color-scheme, an explicit Light on a
+     dark-appearance Mac painted a dark translucent panel under light text. */
+  /* Same warmed values as --bg / --bg-chrome above, carried into the translucent
+     grounds so the real window matches the browser fallback. */
+  --vibrancy-panel: rgba(239, 237, 234, 0.72);
+  --vibrancy-chrome: rgba(244, 242, 239, 0.6);
+}
+
+/* Dark — system half. Matched pair with :root[data-theme="dark"] below. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1c1c1e;
+    --bg-raised: #2c2c2e;
+    --bg-chrome: #232325;
+    --bg-hover: rgba(255, 255, 255, 0.07);
+    --bg-active: rgba(255, 255, 255, 0.12);
+
+    --separator: rgba(255, 255, 255, 0.12);
+    --border: rgba(255, 255, 255, 0.15);
+
+    --label: #f5f5f7;
+    --label-2: #b0b1b5;
+    --label-3: #98999e;
+
+    --accent: #4da2ff;
+    /* Darker than the light fill: it carries white text on a selected menu item
+       and has to clear 4.5:1 there. */
+    --accent-fill: #0a6ad0;
+    /* Dark's --accent already reads at 6.42:1 on the panel ground, so accent text
+       is that same value rather than a deeper one — going darker here (as light
+       does) would move the wrong way against a dark ground. */
+    --accent-text: #4da2ff;
+    --on-accent: #ffffff;
+
+    --good: #37c85f;
+    --unknown: #96979c;
+    --danger: #ff6961;
+    --danger-hover: #ff8a83;
+    --danger-tint: rgba(255, 105, 97, 0.13);
+    --danger-border: rgba(255, 105, 97, 0.34);
+
+    --caution: #e8b23c;
+    --caution-border: rgba(232, 178, 60, 0.4);
+
+    --shadow-popover: 0 8px 28px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+    --scrollbar-thumb: rgba(255, 255, 255, 0.26);
+    --selection: rgba(77, 162, 255, 0.3);
+
+    --vibrancy-panel: rgba(28, 28, 30, 0.72);
+    --vibrancy-chrome: rgba(35, 35, 37, 0.6);
+  }
+}
+
+/* Dark — forced half. Byte-identical to the block above; must stay BELOW it, since
+   the two selectors compute to equal specificity and source order is the tiebreak. */
+:root[data-theme="dark"] {
+  --bg: #1c1c1e;
+  --bg-raised: #2c2c2e;
+  --bg-chrome: #232325;
+  --bg-hover: rgba(255, 255, 255, 0.07);
+  --bg-active: rgba(255, 255, 255, 0.12);
+
+  --separator: rgba(255, 255, 255, 0.12);
+  --border: rgba(255, 255, 255, 0.15);
+
+  --label: #f5f5f7;
+  --label-2: #b0b1b5;
+  --label-3: #98999e;
+
+  --accent: #4da2ff;
+  --accent-fill: #0a6ad0;
+  --accent-text: #4da2ff;
+  --on-accent: #ffffff;
+
+  --good: #37c85f;
+  --unknown: #96979c;
+  --danger: #ff6961;
+  --danger-hover: #ff8a83;
+  --danger-tint: rgba(255, 105, 97, 0.13);
+  --danger-border: rgba(255, 105, 97, 0.34);
+
+  --caution: #e8b23c;
+  --caution-border: rgba(232, 178, 60, 0.4);
+
+  --shadow-popover: 0 8px 28px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.26);
+  --selection: rgba(77, 162, 255, 0.3);
+
+  --vibrancy-panel: rgba(28, 28, 30, 0.72);
+  --vibrancy-chrome: rgba(35, 35, 37, 0.6);
+}
+
+/* An explicit choice narrows color-scheme to match, so the browser-drawn surfaces
+   follow the panel rather than the OS: the Keep running checkbox is a genuinely
+   native system-rendered control (accent-color only), and the scrollbar and focus
+   surfaces are drawn by the engine too. Left at `light dark` in System mode above so
+   the OS keeps deciding there. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 380px;
+  height: 520px;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--label);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-size: 12.5px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Browser surfaces themed from the palette rather than left at their defaults. */
+::selection {
+  background: var(--selection);
+}
+
+button,
+input {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ---------- Vibrancy (real window only) ----------
+
+   The Tauri window is transparent over an NSVisualEffectView, so the panel's own
+   grounds become alpha tints of the same colours and the desktop shows through —
+   the Control Center behaviour the craft bar is set by. Scoped to body.tauri
+   (set in main.js when window.__TAURI__ exists) so a plain browser, which has no
+   material behind it, keeps the opaque grounds as the automatic fallback.
+
+   Only the ground and the two chrome strips are alpha'd. Rows keep their opaque
+   --bg-raised on purpose: Control Center's tiles are opaque over vibrancy too,
+   and --bg itself must stay opaque because .row.is-kept paints with it.
+
+   The title bar and the telemetry line are the same chrome material and must
+   carry the same alpha — translucent on top and opaque at the bottom would read
+   as a seam across the panel.
+
+   Both grounds read TOKENS (--vibrancy-panel / --vibrancy-chrome), so a single pair
+   of rules follows whichever theme is resolved. Duplicating these rule blocks under
+   each theme selector instead would triple them and drift. */
+body.tauri {
+  background: transparent;
+}
+
+body.tauri .panel {
+  background: var(--vibrancy-panel);
+}
+
+body.tauri .titlebar,
+body.tauri .telemetry {
+  background: var(--vibrancy-chrome);
+}
+
+/* ---------- Title bar ---------- */
+
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  padding: 9px 10px 8px 12px;
+  background: var(--bg-chrome);
+  border-bottom: 1px solid var(--separator);
+  -webkit-app-region: drag;
+}
+
+.titlebar-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--label);
+}
+
+.titlebar-count {
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--label-3);
+}
+
+/* docs/IPC.md v1.2: the last scan failed, so the list below is the last one that
+   succeeded. Deliberately styled no louder than the count it replaces — the words
+   carry it, and F7 forbids the indicator ever reading as an interruption. Only the
+   number-alignment rule is dropped, since this is prose, not a count. */
+.titlebar-count.is-scan-failed {
+  font-variant-numeric: normal;
+}
+
+.titlebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+/* Quiet by default, surfacing on hover — the Control Center habit. */
+.titlebar-button {
+  -webkit-app-region: no-drag;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--label-3);
+  cursor: pointer;
+  transition: background 100ms ease-out, color 100ms ease-out;
+}
+
+.titlebar-button:hover {
+  background: var(--bg-hover);
+  color: var(--label);
+}
+
+.titlebar-button:active {
+  background: var(--bg-active);
+}
+
+/* Pressed = on. Filled with the one accent, the way a selected segmented
+   control reads on macOS. */
+.titlebar-button[aria-pressed="true"] {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+}
+
+.titlebar-button.is-spinning svg {
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Body ---------- */
+
+.panel-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px 0 14px;
+}
+
+.panel-body::-webkit-scrollbar {
+  width: 9px;
+}
+
+.panel-body::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.panel-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- Sections ---------- */
+
+.section {
+  padding: 6px 12px 4px;
+}
+
+.section + .section {
+  margin-top: 4px;
+  border-top: 1px solid var(--separator);
+  padding-top: 10px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding: 0 2px;
+}
+
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.section-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--label-3);
+}
+
+/* Visible but small, and never competing with the rows it acts on. */
+.stop-all-button {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--danger);
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.stop-all-button:hover {
+  background: var(--danger-tint);
+}
+
+/* ---------- Project groups ---------- */
+
+.project-group + .project-group {
+  margin-top: 8px;
+}
+
+.project-heading {
+  padding: 0 0 4px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--label-3);
+}
+
+.row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* ---------- Rows ---------- */
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 8px 7px 10px;
+  /* 8px rather than 7px: at this row height a single point is the difference
+     between a card that reads square-ish and one that reads soft, and softer suits
+     the warmed grounds. Held at 8 — beyond that it stops looking like a macOS list
+     row and starts looking like a widget. */
+  border-radius: 8px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  color: var(--label);
+}
+
+.row:hover {
+  border-color: var(--label-3);
+}
+
+.row-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.row-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+/* The one number the user scans for. Monospace and tabular so digits line up
+   down the column; nothing else in the friendly view is monospaced. */
+.port {
+  flex: none;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--label);
+}
+
+.port-more {
+  margin-left: 2px;
+  font-size: 10px;
+  color: var(--label-3);
+}
+
+.row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--label);
+}
+
+/* No page title yet, so the command stands in. Lighter, because it is evidence
+   rather than a name the tool is claiming. */
+.row-title.is-command {
+  color: var(--label-2);
+}
+
+.row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px 8px;
+  margin-top: 3px;
+}
+
+.meta-text {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--label-2);
+}
+
+/* Health: dot plus word, always. Colour alone is never the status. */
+.health {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--label-2);
+}
+
+.health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.health-responding .health-dot {
+  background: var(--good);
+}
+
+.health-unknown .health-dot {
+  background: var(--unknown);
+}
+
+.health-not_responding {
+  color: var(--danger);
+  font-weight: 500;
+}
+
+.health-not_responding .health-dot {
+  background: var(--danger);
+}
+
+/* not_responding: unmistakable, but native — a tinted row and red text, with no
+   rotation or displacement. */
+.row.is-not-responding {
+  background: var(--danger-tint);
+  border-color: var(--danger-border);
+}
+
+/* Network exposure is a security signal: it keeps full strength on every row,
+   including a receded one. A hairline chip on the row's own ground rather than a
+   filled patch — the fill was the panel's last beige surface, and the label
+   reads stronger against the row than against a tint of itself. */
+.badge-network {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--caution);
+  background: transparent;
+  border: 1px solid var(--caution-border);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.guessed-project {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--label-2);
+}
+
+/* Why this row is faded, said in the row. Quiet by construction — no border, no
+   fill, no colour of its own — because it explains a deliberate state rather than
+   flagging one. Its colour is set explicitly here and restated under .is-kept
+   below, never inherited from a container, for the same reason the rest of the
+   kept-row recede is per-element: an ancestor opacity would take the health word
+   and the network badge down with it. */
+.kept-tag {
+  font-size: 10.5px;
+  color: var(--label-3);
+}
+
+/* Keep Running: recedes, stays legible.
+   Expressed as explicit per-element colour, never `opacity` on the container —
+   an ancestor fade composites the whole subtree into one layer, so a child
+   cannot opt back out of it, and the health word and network badge must not
+   recede at all (fading the word leaves the dot carrying status alone, which is
+   colour-alone status). */
+.row.is-kept {
+  background: var(--bg);
+}
+
+.row.is-kept .meta-text,
+.row.is-kept .row-title,
+.row.is-kept .watch-reason,
+.row.is-kept .kept-tag {
+  color: var(--label-3);
+}
+
+/* Explicit per-element colour, never `opacity` on .row-actions — see above. */
+.row.is-kept .icon-button,
+.row.is-kept .keep-toggle {
+  color: var(--label-3);
+}
+
+/* Both hovers are restated inside .is-kept. The receded colour above is
+   (.row.is-kept .icon-button) = 3 classes, so it outranks plain
+   `.icon-button:hover` (2); and this restatement is 4, which in turn outranks
+   `.icon-button.is-danger:hover` (3) — so without the danger line below, Stop on
+   a kept row would hover grey instead of red. */
+.row.is-kept .icon-button:hover {
+  color: var(--label);
+}
+
+.row.is-kept .icon-button.is-danger:hover {
+  color: var(--danger);
+}
+
+.row.is-kept:hover {
+  background: var(--bg-raised);
+}
+
+.row.is-kept:hover .row-title {
+  color: var(--label);
+}
+
+/* ---------- Row actions ---------- */
+
+/* Quiet until the row is hovered. Keyboard focus and a pending stop also reveal
+   them, so they are never unreachable without a pointer. */
+.row-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.row:hover .row-actions,
+.row:focus-within .row-actions,
+.row-actions.is-pinned {
+  opacity: 1;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--label-3);
+  cursor: pointer;
+}
+
+.icon-button:hover {
+  background: var(--bg-hover);
+  color: var(--label);
+}
+
+.icon-button:active {
+  background: var(--bg-active);
+}
+
+.icon-button.is-danger:hover {
+  background: var(--danger-tint);
+  color: var(--danger);
+}
+
+.icon-button:disabled {
+  color: var(--label-3);
+  cursor: default;
+  background: transparent;
+}
+
+/* Keep running: a small native-size checkbox, system-rendered via accent-color.
+   The label reads "Keep running" rather than "Keep" — the two extra words are what
+   make it name a state instead of issuing an instruction. They also make this the
+   widest control in the action row, so the gap and padding are tightened and the
+   type dropped a notch (10.5px, matching the other secondary tags) to buy the room
+   back: at 380px the worst-case row — multi-port, folder button, expand, this, and
+   Stop — has to fit without wrapping. */
+.keep-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0 4px 0 3px;
+  height: 22px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  color: var(--label-2);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.keep-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.keep-toggle input {
+  margin: 0;
+  width: 12px;
+  height: 12px;
+  accent-color: var(--accent-fill);
+  cursor: pointer;
+}
+
+/* ---------- Still-running note ---------- */
+
+.still-running-note {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--danger-border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+}
+
+.still-running-lead {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.still-running-detail {
+  flex: 1 1 100%;
+  font-size: 11px;
+  color: var(--label-2);
+}
+
+.force-button {
+  border: 1px solid var(--danger-border);
+  background: transparent;
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.force-button:hover {
+  background: var(--danger-tint);
+}
+
+/* ---------- Watch only rows: no action slot exists in this layout at all.
+   Not a disabled control — no reserved room for one. ---------- */
+
+.watch-reason {
+  font-size: 11px;
+  color: var(--label-2);
+}
+
+/* ---------- Nerd stats ---------- */
+
+/* Monospace here is for data and measurement, which is the one place it earns
+   its keep in this panel. */
+.nerds {
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px solid var(--separator);
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.nerds dt {
+  color: var(--label-3);
+}
+
+.nerds dd {
+  margin: 0;
+  color: var(--label-2);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Empty state ---------- */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  /* Roomier than the old 34px: this state is the panel at rest, and it holds the
+     illustration slot. Generous separation around a single short message is what
+     makes an empty panel read as calm rather than as something failing to load. */
+  padding: 46px 24px 40px;
+  color: var(--label-2);
+}
+
+.empty-state-icon {
+  color: var(--good);
+  margin-bottom: 12px;
+}
+
+/* The "couldn't check" empty state. Deliberately NOT --danger: nothing is wrong with
+   the user's machine, the tool simply could not look — and not --good either, since
+   the green check is the very claim this state exists to withhold. */
+.empty-state-icon.is-muted {
+  color: var(--label-3);
+}
+
+.empty-state-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label);
+  margin-bottom: 5px;
+}
+
+.empty-state-body {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--label-2);
+  max-width: 250px;
+}
+
+/* ---------- Telemetry ---------- */
+
+.telemetry {
+  flex: none;
+  padding: 5px 12px;
+  border-top: 1px solid var(--separator);
+  background: var(--bg-chrome);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--label-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Popover menu (go to source) ---------- */
+
+/* position: fixed, rendered into #overlay-root — see index.html for why it can
+   live neither inside a row nor inside the scrolling body. */
+.menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 168px;
+  padding: 4px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  box-shadow: var(--shadow-popover);
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--label);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Highlight follows the pointer AND the keyboard, the way a real menu does. */
+.menu-item:hover,
+.menu-item:focus {
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  outline: none;
+}
+
+.menu-item svg {
+  flex: none;
+  opacity: 0.75;
+}
+
+.menu-path {
+  padding: 4px 8px 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10px;
+  color: var(--label-3);
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--separator);
+  margin-bottom: 4px;
+}
+
+/* ---------- Dialogs ---------- */
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 40;
+}
+
+.dialog {
+  width: 100%;
+  max-width: 310px;
+  background: var(--bg-raised);
+  color: var(--label);
+  border-radius: 11px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-popover);
+  padding: 15px 16px 13px;
+  text-align: center;
+}
+
+.dialog-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  margin: 0 0 5px;
+  color: var(--label);
+}
+
+.dialog-body {
+  font-size: 11.5px;
+  color: var(--label-2);
+  line-height: 1.45;
+  margin: 0 0 14px;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dialog-button {
+  flex: 1 1 0;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--label);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.dialog-button:hover {
+  background: var(--bg-hover);
+}
+
+/* N2: never destructive by surprise. main.js focuses Cancel on open so Enter and
+   Space land on the safe action — but a pointer-opened dialog suppresses
+   :focus-visible, so that focus alone paints nothing and the destructive button
+   would read as the default. The default affordance is therefore structural, set
+   as a class by main.js, not dependent on focus state. */
+.dialog-button.is-default {
+  background: var(--accent-fill);
+  border-color: transparent;
+  color: var(--on-accent);
+  font-weight: 600;
+}
+
+.dialog-button.is-default:hover {
+  filter: brightness(1.08);
+}
+
+.dialog-button.is-danger {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.dialog-button.is-danger:hover {
+  background: var(--danger-tint);
+  border-color: var(--danger-border);
+}
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  background: var(--bg-raised);
+  color: var(--label);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  box-shadow: var(--shadow-popover);
+  z-index: 50;
+}
+
+/* ---------- Pages (Settings, Help) ----------
+
+   In-panel views, not windows: the panel body swaps to the page and a back
+   affordance returns. Same grounds, same type, same controls as the list — a page
+   here is another room in the panel, not a different surface. */
+
+.page {
+  padding: 4px 14px 18px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 10px;
+}
+
+/* Reads as a native back control: chevron plus the word, quiet until hovered. */
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: -6px;
+  padding: 3px 7px 3px 5px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  /* --accent-text, not --accent or --accent-fill: --accent is tuned as a hairline/
+     focus colour (4.79:1 as text on the warmed ground — passing, but the tightest
+     pair in the panel for a control reached on every page), and --accent-fill is
+     tuned as a FILL behind white text, so it is darker still and measures worse in
+     dark mode (3.23:1). --accent-text is the same hue set for reading on the panel
+     ground in each mode. */
+  color: var(--accent-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.back-button:hover {
+  background: var(--bg-hover);
+}
+
+.page-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--label);
+}
+
+.page-subhead {
+  margin: 18px 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--label-2);
+}
+
+.page-text {
+  margin: 0 0 4px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--label-2);
+}
+
+/* ---------- Settings fields ---------- */
+
+.field + .field {
+  margin-top: 16px;
+}
+
+.field-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--label);
+  margin-bottom: 6px;
+}
+
+.field-hint {
+  margin-top: 5px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--label-3);
+}
+
+/* Segmented control, the macOS way: one recessed track, the selected segment lifted
+   onto the raised ground rather than filled with the accent. The accent is reserved
+   for pressed toggles and the dialog default (DESIGN.md), and a three-way appearance
+   picker is a choice among peers, not an on/off state. */
+.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--bg-active);
+}
+
+.segment {
+  flex: 1 1 0;
+  padding: 4px 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--label-2);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: background 100ms ease-out, color 100ms ease-out;
+}
+
+.segment:hover {
+  color: var(--label);
+}
+
+.segment[aria-checked="true"] {
+  background: var(--bg-raised);
+  color: var(--label);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.switch-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--label-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Same native checkbox as the row's Keep running control — one form vocabulary
+   across the panel, no custom checkbox graphic anywhere. */
+.switch-row input {
+  margin: 0;
+  width: 13px;
+  height: 13px;
+  accent-color: var(--accent-fill);
+  cursor: pointer;
+}
+
+.select {
+  width: 100%;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-raised);
+  color: var(--label);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+
+/* ---------- Page footers ---------- */
+
+.page-footer {
+  margin-top: 22px;
+  padding-top: 10px;
+  border-top: 1px solid var(--separator);
+}
+
+.footer-name {
+  font-size: 11px;
+  color: var(--label-2);
+}
+
+.footer-note {
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: var(--label-3);
+}
+
+/* Quiet and inert until there is a real destination behind it. Disabled rather than
+   hidden so the intent is visible, but it never reads as a live link. */
+.sponsor-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--label-3);
+  font-size: 11px;
+  cursor: default;
+}
+
+/* ---------- Help word list ---------- */
+
+.word-list {
+  margin: 0;
+}
+
+.word-list dt {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--label);
+}
+
+.word-list dd {
+  margin: 1px 0 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--label-2);
+}
+
+/* ---------- Illustration slots ----------
+
+   Empty until the artwork exists. The container is `hidden` until an <img> actually
+   decodes (see pages.js), so a missing file costs no broken glyph and no reserved
+   height — the layout is identical to one that never had a slot. */
+
+.asset-slot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Expected asset: src/assets/help-header.png — 686×216 @2x, displayed 343×108.
+   Sized to .page's content column, NOT bled to the panel edges: the Help page
+   scrolls, so #panel-body's content box is 371px (380 minus the 9px scrollbar) and
+   a full-bleed slot would be clipped on the right by overflow-x: hidden. The
+   displayed width is that 371px less .page's 14px padding either side = 343px, and
+   the height keeps the intended 16:5 proportion. */
+.asset-slot-help {
+  margin: 0 0 12px;
+}
+
+/* Expected asset: src/assets/empty-harbor.png — 480×360 @2x, displayed 240×180. */
+.asset-slot-empty {
+  width: 240px;
+  max-width: 100%;
+  margin-bottom: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row-actions,
+  .titlebar-button,
+  .segment {
+    transition: none;
+  }
+  .titlebar-button.is-spinning svg {
+    animation: none;
+  }
+}

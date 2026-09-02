@@ -1,0 +1,15 @@
+{
+  "name": "portside-app",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@ant-design/icons-svg": "^4.6.0",
+    "@tauri-apps/cli": "^2"
+  },
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "author": "Purin Buriwong <askpurin@pm.me>"
+}

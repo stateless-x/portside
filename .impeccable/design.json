@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-02T00:00:00Z",
+  "title": "Design System: Portside",
+  "extensions": {
+    "colorMeta": {
+      "bg": { "role": "neutral", "displayName": "Panel Ground", "canonical": "#ececec", "darkMode": "#1c1c1e" },
+      "bg-raised": { "role": "neutral", "displayName": "Raised Ground", "canonical": "#ffffff", "darkMode": "#2c2c2e", "note": "Rows, dialogs, menu, and toast. Stays opaque even under vibrancy." },
+      "bg-chrome": { "role": "neutral", "displayName": "Chrome Ground", "canonical": "#f2f2f2", "darkMode": "#232325", "note": "Title bar and telemetry footer." },
+      "bg-hover": { "role": "neutral", "displayName": "Hover Wash", "canonical": "rgba(0, 0, 0, 0.045)", "darkMode": "rgba(255, 255, 255, 0.07)" },
+      "bg-active": { "role": "neutral", "displayName": "Active Wash", "canonical": "rgba(0, 0, 0, 0.08)", "darkMode": "rgba(255, 255, 255, 0.12)" },
+      "separator": { "role": "neutral", "displayName": "Separator Hairline", "canonical": "rgba(0, 0, 0, 0.11)", "darkMode": "rgba(255, 255, 255, 0.12)" },
+      "border": { "role": "neutral", "displayName": "Border Hairline", "canonical": "rgba(0, 0, 0, 0.13)", "darkMode": "rgba(255, 255, 255, 0.15)" },
+      "label": { "role": "neutral", "displayName": "Primary Label", "canonical": "#1d1d1f", "darkMode": "#f5f5f7" },
+      "label-2": { "role": "neutral", "displayName": "Secondary Label", "canonical": "#55565a", "darkMode": "#b0b1b5", "note": "Carries most repeated meta text; held above 4.5:1." },
+      "label-3": { "role": "neutral", "displayName": "Tertiary Label", "canonical": "#636469", "darkMode": "#98999e", "note": "Verified >=4.5:1 on raised card, recessed kept row, and chrome grounds." },
+      "accent": { "role": "primary", "displayName": "Accent", "canonical": "#0064d2", "darkMode": "#4da2ff" },
+      "accent-fill": { "role": "primary", "displayName": "Accent Fill", "canonical": "#0a71e0", "darkMode": "#0a6ad0", "note": "Darker in dark mode: carries white text on a selected menu item, must clear 4.5:1 there." },
+      "on-accent": { "role": "primary", "displayName": "On Accent", "canonical": "#ffffff", "darkMode": "#ffffff" },
+      "good": { "role": "tertiary", "displayName": "Health Good", "canonical": "#1d7a44", "darkMode": "#37c85f" },
+      "unknown": { "role": "tertiary", "displayName": "Health Unknown", "canonical": "#66676b", "darkMode": "#96979c" },
+      "danger": { "role": "tertiary", "displayName": "Danger", "canonical": "#b0241d", "darkMode": "#ff6961", "note": "Held dark enough in light mode to clear 4.5:1 as text on the tinted not_responding row (composites danger-tint over bg)." },
+      "danger-hover": { "role": "tertiary", "displayName": "Danger Hover", "canonical": "#a22019", "darkMode": "#ff8a83" },
+      "danger-tint": { "role": "tertiary", "displayName": "Danger Row Tint", "canonical": "rgba(192, 42, 34, 0.075)", "darkMode": "rgba(255, 105, 97, 0.13)" },
+      "danger-border": { "role": "tertiary", "displayName": "Danger Border", "canonical": "rgba(192, 42, 34, 0.3)", "darkMode": "rgba(255, 105, 97, 0.34)" },
+      "caution": { "role": "tertiary", "displayName": "Network Caution", "canonical": "#7a5300", "darkMode": "#e8b23c", "note": "Amber, deliberately not sharing the danger channel — caution means 'notice', danger means 'wrong'." },
+      "caution-border": { "role": "tertiary", "displayName": "Network Chip Border", "canonical": "rgba(122, 83, 0, 0.45)", "darkMode": "rgba(232, 178, 60, 0.4)", "note": "The chip has no fill; this border is its whole affordance, so it runs at higher alpha than other hairlines." }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Panel Title", "purpose": "\"Portside\" in the title bar. The system's one letterspacing value (-0.01em)." },
+      "body": { "displayName": "Body / Row Title", "purpose": "Server/service labels, dialog body copy, general sentence-case text." },
+      "meta": { "displayName": "Meta / Section Label", "purpose": "Section titles, uptime, health word, project heading, dialog title." },
+      "data": { "displayName": "Data (mono)", "purpose": "Port numbers, nerd grid, telemetry footer, source-menu path — confined to measured/counted values only." }
+    },
+    "shadows": [
+      { "name": "shadow-popover", "value": "0 6px 24px rgba(0, 0, 0, 0.18), 0 1px 3px rgba(0, 0, 0, 0.1)", "purpose": "The system's only shadow token (dark mode: 0 8px 28px rgba(0,0,0,0.55), 0 1px 3px rgba(0,0,0,0.4)). Used exclusively by the popover menu, the dialog, and the toast — nothing at rest in the row flow carries a shadow." }
+    ],
+    "motion": [
+      { "name": "control-transition", "value": "background 100ms ease-out, color 100ms ease-out", "purpose": "Titlebar and icon button hover/press transitions." },
+      { "name": "row-actions-reveal", "value": "opacity 120ms ease-out", "purpose": "Reveals a row's action cluster on hover/focus-within, or pins it visible during a pending stop or expanded state. A visibility toggle, not a recede device — see the Recede-By-Element-Color Rule for why this is a distinct, permitted use of opacity." },
+      { "name": "refresh-spin", "value": "spin 0.6s linear infinite", "purpose": "Refresh icon while a refresh is in flight. Suppressed under prefers-reduced-motion." }
+    ],
+    "breakpoints": [],
+    "vibrancy": {
+      "status": "provisional",
+      "note": "windowEffects 'popover' + macOSPrivateApi (Cargo feature macos-private-api) make the real Tauri window transparent over an NSVisualEffectView. body.tauri (set in main.js pre-paint when window.__TAURI__ exists) gates translucent grounds; a plain browser keeps the opaque fallback automatically. Rows (--bg-raised) stay opaque in both cases.",
+      "panelAlpha": 0.72,
+      "chromeAlpha": 0.6,
+      "caveat": "Both alpha values were tuned by eye against a screenshot, not the real compiled window, and are pending a pass against the actual material."
+    },
+    "antiReference": {
+      "world": "ATC strip board",
+      "description": "A prior, fully built and shipped direction: paper flight-progress strips clipped to a controller's board, holder-edge Kind-color coding, a cocked/rotated 'not responding' strip, letterspaced monospace stamps, a beige paper surface.",
+      "status": "rejected by the user as ugly; replaced entirely by this native-macOS system",
+      "prohibitions": ["no paper strips", "no holder edges", "no cocked rotation", "no letterspaced stamps", "no beige"]
+    }
+  },
+  "components": [
+    {
+      "name": "Dev Row (responding)",
+      "kind": "custom",
+      "refersTo": "row",
+      "description": "A development server row: port, title, health, uptime, unattended hint, hover-revealed actions (expand, go to source, Keep, Stop).",
+      "html": "<div class=\"ds-row\"><div class=\"ds-row-body\"><div class=\"ds-row-headline\"><span class=\"ds-port\">4399</span><span class=\"ds-row-title\">Vala Platform — Dev</span></div><div class=\"ds-row-meta\"><span class=\"ds-health ds-health-good\"><span class=\"ds-health-dot\"></span>responding</span><span class=\"ds-meta-text\">3h 12m</span><span class=\"ds-meta-text\">unattended</span></div></div><div class=\"ds-row-actions\"><button class=\"ds-icon-button\" aria-label=\"Show details\"><svg viewBox=\"64 64 896 896\" width=\"10\" height=\"10\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M765.7 486.8L314.9 134.7A7.97 7.97 0 00302 141v77.3c0 4.9 2.3 9.6 6.1 12.6l360 281.1-360 281.1c-3.9 3-6.1 7.7-6.1 12.6V883c0 6.7 7.7 10.4 12.9 6.3l450.8-352.1a31.96 31.96 0 000-50.4z\"/></svg></button><label class=\"ds-keep-toggle\"><input type=\"checkbox\"/>Keep</label><button class=\"ds-icon-button ds-is-danger\" aria-label=\"Stop\"><svg viewBox=\"64 64 896 896\" width=\"13\" height=\"13\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm0 820c-205.4 0-372-166.6-372-372 0-89 31.3-170.8 83.5-234.8l523.3 523.3C682.8 852.7 601 884 512 884zm288.5-137.2L277.2 223.5C341.2 171.3 423 140 512 140c205.4 0 372 166.6 372 372 0 89-31.3 170.8-83.5 234.8z\"/></svg></button></div></div>",
+      "css": ".ds-row { display: flex; align-items: flex-start; gap: 8px; padding: 7px 8px 7px 10px; border-radius: 7px; background: #ffffff; border: 1px solid rgba(0,0,0,0.13); color: #1d1d1f; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif; font-size: 12.5px; } .ds-row:hover { border-color: #636469; } .ds-row-body { flex: 1 1 auto; min-width: 0; } .ds-row-headline { display: flex; align-items: baseline; gap: 7px; } .ds-port { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; } .ds-row-title { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; margin-top: 3px; font-size: 11px; color: #55565a; } .ds-health { display: inline-flex; align-items: center; gap: 4px; } .ds-health-dot { width: 7px; height: 7px; border-radius: 50%; background: #1d7a44; } .ds-row-actions { flex: none; display: flex; align-items: center; gap: 1px; opacity: 0; transition: opacity 120ms ease-out; } .ds-row:hover .ds-row-actions, .ds-row:focus-within .ds-row-actions { opacity: 1; } .ds-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: none; border-radius: 5px; background: transparent; color: #636469; cursor: pointer; } .ds-icon-button:hover { background: rgba(0,0,0,0.045); color: #1d1d1f; } .ds-icon-button.ds-is-danger:hover { background: rgba(192,42,34,0.075); color: #b0241d; } .ds-keep-toggle { display: inline-flex; align-items: center; gap: 4px; padding: 0 5px 0 3px; height: 22px; border-radius: 5px; font-size: 11px; color: #55565a; cursor: pointer; } .ds-keep-toggle:hover { background: rgba(0,0,0,0.045); } .ds-keep-toggle input { width: 12px; height: 12px; accent-color: #0a71e0; }"
+    },
+    {
+      "name": "Dev Row (not responding)",
+      "kind": "custom",
+      "refersTo": "row",
+      "description": "The danger state: a tinted row and red health text/dot — unmistakable but native, with no rotation or displacement. The direct rejection of the former 'cocked strip' treatment.",
+      "html": "<div class=\"ds-row ds-is-not-responding\"><div class=\"ds-row-body\"><div class=\"ds-row-headline\"><span class=\"ds-port\">4321<span class=\"ds-port-more\">+1</span></span><span class=\"ds-row-title ds-is-command\">cargo run --bin api</span></div><div class=\"ds-row-meta\"><span class=\"ds-health ds-health-bad\"><span class=\"ds-health-dot\"></span>not responding</span><span class=\"ds-meta-text\">3d 0h</span><span class=\"ds-meta-text\">unattended</span></div></div></div>",
+      "css": ".ds-is-not-responding { background: rgba(192, 42, 34, 0.075); border-color: rgba(192, 42, 34, 0.3); } .ds-port-more { margin-left: 2px; font-size: 10px; color: #636469; } .ds-is-command { color: #55565a; } .ds-health-bad { color: #b0241d; font-weight: 500; } .ds-health-bad .ds-health-dot { background: #b0241d; width: 7px; height: 7px; border-radius: 50%; }"
+    },
+    {
+      "name": "Watch-Only Row",
+      "kind": "custom",
+      "refersTo": "row",
+      "description": "No action slot at all — only the expand chevron. No health, no pid, no command: a WatchOnlyServer carries none of those fields.",
+      "html": "<div class=\"ds-row\"><div class=\"ds-row-body\"><div class=\"ds-row-headline\"><span class=\"ds-port\">7000</span><span class=\"ds-row-title\">Control Center</span></div><div class=\"ds-row-meta\"><span class=\"ds-meta-text\">part of macOS</span><span class=\"ds-meta-text\">2d 4h</span></div></div><div class=\"ds-row-actions\" style=\"opacity:1\"><button class=\"ds-icon-button\" aria-label=\"Show details\"><svg viewBox=\"64 64 896 896\" width=\"10\" height=\"10\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M765.7 486.8L314.9 134.7A7.97 7.97 0 00302 141v77.3c0 4.9 2.3 9.6 6.1 12.6l360 281.1-360 281.1c-3.9 3-6.1 7.7-6.1 12.6V883c0 6.7 7.7 10.4 12.9 6.3l450.8-352.1a31.96 31.96 0 000-50.4z\"/></svg></button></div></div>",
+      "css": "/* Shares .ds-row and .ds-icon-button from the Dev Row entry above. This row's actions element contains only the disclosure control — appended directly, never via the shared dev-row action builder, so no future edit can leak a Stop control onto a row kind that must never offer one. */"
+    },
+    {
+      "name": "Network Badge",
+      "kind": "custom",
+      "refersTo": "row",
+      "description": "Transparent hairline chip, never a filled tint — the fill was the panel's last beige surface before this rewrite, and the anti-reference now forbids it outright.",
+      "html": "<span class=\"ds-badge-network\"><svg viewBox=\"64 64 896 896\" width=\"10\" height=\"10\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M854.4 800.9c.2-.3.5-.6.7-.9C920.6 722.1 960 621.7 960 512s-39.4-210.1-104.8-288a300 300 0 00-9.9-11.7C736.4 109.2 629.5 64 512 64s-224.4 45.2-304.3 119.2a300 300 0 00-9.9 11.7C133.4 301.9 94 402.3 94 512s39.4 210.1 104.8 288c.2.3.5.6.7.9 80.1 74 187 119.2 304.5 119.2s224.4-45.2 304.3-119.2z\"/></svg>on your network</span>",
+      "css": ".ds-badge-network { display: inline-flex; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 500; color: #7a5300; background: transparent; border: 1px solid rgba(122, 83, 0, 0.45); padding: 0 4px; border-radius: 4px; }"
+    },
+    {
+      "name": "Stop Confirmation Dialog",
+      "kind": "custom",
+      "refersTo": "dialog-button-default",
+      "description": "Cancel sits rightmost and carries the accent-filled default styling — a deliberate safety-first inversion of the usual confirm-on-the-right convention, since every dialog in this panel confirms a stop.",
+      "html": "<div class=\"ds-dialog\"><h2 class=\"ds-dialog-title\">Stop this server?</h2><p class=\"ds-dialog-body\">This stops Vala Platform — Dev (vala-platform &middot; apps/web). Its ports will be released.</p><div class=\"ds-dialog-actions\"><button class=\"ds-dialog-button ds-is-danger\">Stop</button><button class=\"ds-dialog-button ds-is-default\">Cancel</button></div></div>",
+      "css": ".ds-dialog { width: 100%; max-width: 310px; background: #ffffff; color: #1d1d1f; border-radius: 11px; border: 1px solid rgba(0,0,0,0.13); box-shadow: 0 6px 24px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.1); padding: 15px 16px 13px; text-align: center; } .ds-dialog-title { font-size: 12.5px; font-weight: 600; margin: 0 0 5px; } .ds-dialog-body { font-size: 11.5px; color: #55565a; line-height: 1.45; margin: 0 0 14px; } .ds-dialog-actions { display: flex; gap: 8px; } .ds-dialog-button { flex: 1 1 0; border: 1px solid rgba(0,0,0,0.13); background: #ececec; color: #1d1d1f; font-size: 12px; font-weight: 500; padding: 5px 12px; border-radius: 6px; cursor: pointer; } .ds-dialog-button:hover { background: rgba(0,0,0,0.045); } .ds-is-default { background: #0a71e0; border-color: transparent; color: #ffffff; font-weight: 600; } .ds-is-default:hover { filter: brightness(1.08); } .ds-is-danger { color: #b0241d; font-weight: 600; } .ds-is-danger:hover { background: rgba(192,42,34,0.075); border-color: rgba(192,42,34,0.3); }"
+    },
+    {
+      "name": "Titlebar",
+      "kind": "custom",
+      "refersTo": "titlebar-button",
+      "description": "Drag-region title bar: panel title, live server count, and two quiet icon buttons (Stats, Refresh) that opt out of dragging individually. Stats fills solid accent when pressed, like a selected segmented control.",
+      "html": "<header class=\"ds-titlebar\"><h1 class=\"ds-titlebar-title\">Portside</h1><span class=\"ds-titlebar-count\">5 servers</span><div class=\"ds-titlebar-actions\"><button class=\"ds-titlebar-button\" aria-pressed=\"true\"><svg viewBox=\"64 64 896 896\" width=\"13\" height=\"13\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M924.8 385.6a446.7 446.7 0 00-96-142.4 446.7 446.7 0 00-142.4-96C631.1 123.8 572.5 112 512 112s-119.1 11.8-174.4 35.2a446.7 446.7 0 00-142.4 96 446.7 446.7 0 00-96 142.4C75.8 440.9 64 499.5 64 560c0 132.7 58.3 257.7 159.9 343.1l1.7 1.4c5.8 4.8 13.1 7.5 20.6 7.5h531.7c7.5 0 14.8-2.7 20.6-7.5l1.7-1.4C901.7 817.7 960 692.7 960 560c0-60.5-11.9-119.1-35.2-174.4z\"/></svg></button><button class=\"ds-titlebar-button\"><svg viewBox=\"64 64 896 896\" width=\"13\" height=\"13\" fill=\"currentColor\" aria-hidden=\"true\"><path d=\"M909.1 209.3l-56.4 44.1C775.8 155.1 656.2 92 521.9 92 290 92 102.3 279.5 102 511.5 101.7 743.7 289.8 932 521.9 932c181.3 0 335.8-115 394.6-276.1\"/></svg></button></div></header>",
+      "css": ".ds-titlebar { display: flex; align-items: center; gap: 7px; padding: 9px 10px 8px 12px; background: #f2f2f2; border-bottom: 1px solid rgba(0,0,0,0.11); } .ds-titlebar-title { margin: 0; font-size: 13px; font-weight: 600; letter-spacing: -0.01em; } .ds-titlebar-count { font-size: 11.5px; font-variant-numeric: tabular-nums; color: #636469; } .ds-titlebar-actions { display: flex; gap: 2px; margin-left: auto; } .ds-titlebar-button { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 22px; border: none; border-radius: 5px; background: transparent; color: #636469; cursor: pointer; transition: background 100ms ease-out, color 100ms ease-out; } .ds-titlebar-button:hover { background: rgba(0,0,0,0.045); color: #1d1d1f; } .ds-titlebar-button[aria-pressed='true'] { background: #0a71e0; color: #ffffff; }"
+    },
+    {
+      "name": "Go-to-Source Popover Menu",
+      "kind": "custom",
+      "refersTo": "row",
+      "description": "Anchored, fixed-position menu showing the destination path before its action list, so the user sees where an action goes before choosing it.",
+      "html": "<div class=\"ds-menu\"><div class=\"ds-menu-path\">/Users/dev/code/vala-platform</div><button class=\"ds-menu-item\" style=\"background:#0a71e0;color:#fff\">Open in Editor</button><button class=\"ds-menu-item\">Reveal in Finder</button><button class=\"ds-menu-item\">Copy path</button></div>",
+      "css": ".ds-menu { min-width: 168px; padding: 4px; background: #ffffff; border: 1px solid rgba(0,0,0,0.13); border-radius: 7px; box-shadow: 0 6px 24px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.1); } .ds-menu-path { padding: 4px 8px 6px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; color: #636469; border-bottom: 1px solid rgba(0,0,0,0.11); margin-bottom: 4px; } .ds-menu-item { display: flex; align-items: center; gap: 7px; width: 100%; padding: 5px 8px; border: none; border-radius: 4px; background: transparent; color: #1d1d1f; font-size: 12px; text-align: left; cursor: pointer; }"
+    },
+    {
+      "name": "Nerd Grid",
+      "kind": "custom",
+      "refersTo": "row",
+      "description": "Monospace dt/dd data grid — the one place besides the port number and telemetry that monospace appears. Every field is a Snapshot field already on hand.",
+      "html": "<dl class=\"ds-nerds\"><dt>pid</dt><dd>3001</dd><dt>cmd</dt><dd>python -m http.server 8080</dd><dt>ports</dt><dd>8080/v4 all_interfaces</dd></dl>",
+      "css": ".ds-nerds { margin-top: 7px; padding-top: 6px; border-top: 1px solid rgba(0,0,0,0.11); display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; line-height: 1.45; } .ds-nerds dt { color: #636469; } .ds-nerds dd { margin: 0; color: #55565a; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The First-Party Panel",
+    "overview": "Portside is a native macOS menu-bar panel, played straight. It borrows nothing from a designed metaphor — no board, no paper, no stamped tickets — and everything from the first-party Apple vocabulary: system type, system grays, hairline separators, quiet controls that only surface on hover, one accent color used sparingly. The craft bar is Apple's own Control Center, Things 3, and iStat Menus. The tool's ambition is to disappear into the task. Light and dark are both first-class renditions of the same system, not one inverted from the other. A prior direction, an 'ATC strip board' world (paper flight-progress strips, holder-edge color coding, cocked/rotated alarm strips, letterspaced monospace stamps, a beige paper surface), was fully built and then rejected by the user as ugly. It is the anti-reference for this system: no paper strips, no holder edges, no cocked rotation, no letterspaced stamps, no beige.",
+    "keyCharacteristics": [
+      "Native materials only: system sans, system grays, hairline dividers, native-weight vibrancy — no invented surface metaphor.",
+      "One accent, used only for the pressed/selected state and the dialog's default action.",
+      "Controls are quiet by default and reveal on hover/focus — the Control Center habit.",
+      "Status is never color-alone: the health word always ships beside the dot.",
+      "Recede is per-element color, never container opacity.",
+      "Monospace is reserved for data (ports, pids, nerd grid, telemetry); system sans carries every name and every sentence."
+    ],
+    "rules": [
+      { "name": "The Beige Is the Anti-Reference Rule", "body": "The network badge is a transparent hairline chip on the row's own ground, never a tinted/filled amber patch — a filled badge was the panel's last surviving trace of the rejected strip-board world.", "section": "colors" },
+      { "name": "The One Ground, Two Chrome Strips Rule", "body": "Only --bg (the panel) and the title bar / telemetry chrome go translucent under vibrancy; --bg-raised (every row, dialog, menu, toast) stays opaque in both a plain browser and the real window.", "section": "colors" },
+      { "name": "The Data-Only Mono Rule", "body": "Monospace is reserved for port numbers, the nerd grid, telemetry, and the source-menu path. Everything else is system sans in sentence case; no letterspacing anywhere except the panel title's -0.01em.", "section": "typography" },
+      { "name": "The Recede-By-Element-Color Rule", "body": "A receding row is never dimmed with opacity on its container, because opacity composites the whole subtree and a child cannot opt back out. Only named elements (label-3 on controls and quiet meta) recede; the health word and network badge never do. This does not prohibit opacity as a hover/focus reveal device, which .row-actions uses legitimately.", "section": "elevation" },
+      { "name": "The Cancel-Is-Default Rule", "body": "Every dialog confirms a stop, so Cancel sits rightmost with the accent-filled default styling and programmatic focus, while the destructive action sits to its left, bordered only — a deliberate safety-first inversion of the platform's usual confirm-on-the-right convention.", "section": "components" }
+    ],
+    "dos": [
+      "Do ship the health word next to the dot always — color is never the only carrier of status.",
+      "Do recede a row by naming individual elements (--label-3), never by setting opacity on the row container (The Recede-By-Element-Color Rule).",
+      "Do keep .health's word and .badge-network at full strength under every recede state, in both modes.",
+      "Do render the network badge as a transparent hairline chip on the row's own ground, never a filled tint.",
+      "Do make Cancel the rightmost, accent-filled default button in every confirmation dialog, and the destructive action bordered and never rightmost (The Cancel-Is-Default Rule).",
+      "Do confine monospace to port numbers, the nerd grid, telemetry, and the source-menu path; everything else is system sans, sentence case.",
+      "Do author light and dark as two first-class renditions, both verified >=4.5:1 on their real composited grounds.",
+      "Do treat vibrancy alphas (currently 0.72 panel / 0.6 chrome) as provisional until checked against the real compiled window."
+    ],
+    "donts": [
+      "Don't reintroduce anything from the rejected 'ATC strip board' world: no paper strips, no holder-edge color coding, no cocked/rotated alarm state, no letterspaced stamps, no beige.",
+      "Don't dim a receding row (or any subtree) with container opacity — it composites the whole subtree into one layer, so a child cannot opt back out.",
+      "Don't give a watch-only row a disabled Stop button as a stand-in for 'no action' — the layout has no action slot for that row kind at all.",
+      "Don't offer 'go to source' on a row whose project path is null, or on a watch-only row — both would either lie or point nowhere.",
+      "Don't letterspace or uppercase section titles or button labels; sentence case throughout, with the panel title's -0.01em as the system's one tracking value."
+    ]
+  }
+}

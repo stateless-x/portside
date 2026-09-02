@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Portside</title>
+    <script type="module" src="/main.js" defer></script>
+  </head>
+
+  <body>
+    <!--
+THESIS: A first-party macOS menu-bar panel, played straight. System type, system grays, quiet controls, one accent; the craft bar is Apple's Control Center, Things 3, and iStat Menus. Earned familiarity is the point — the tool disappears into the task. The prior "ATC strip board" world is the ANTI-REFERENCE: no paper strips, no holder edges, no cocked rotation, no letterspaced stamps, no beige.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance.
+    -->
+    <div class="panel">
+      <header class="titlebar">
+        <h1 class="titlebar-title">Portside</h1>
+        <span id="server-count" class="titlebar-count" aria-live="polite"></span>
+
+        <div class="titlebar-actions">
+          <button
+            id="settings-button"
+            class="titlebar-button"
+            type="button"
+            title="Settings"
+            aria-label="Settings"
+          ></button>
+          <button
+            id="help-button"
+            class="titlebar-button"
+            type="button"
+            title="Help"
+            aria-label="Help"
+          ></button>
+          <button
+            id="stats-toggle"
+            class="titlebar-button"
+            type="button"
+            aria-pressed="false"
+            title="Stats for nerds"
+            aria-label="Stats for nerds"
+          ></button>
+          <button
+            id="refresh-button"
+            class="titlebar-button"
+            type="button"
+            title="Refresh now"
+            aria-label="Refresh now"
+          ></button>
+        </div>
+      </header>
+
+      <!-- One scroll container, three views inside it. #panel-body keeps ownership
+           of the scrollbar (and its theming); the views are swapped by toggling
+           `hidden` in main.js. The list view is never torn down when a page opens,
+           so render.js keeps painting into it underneath and returning to it shows
+           current data rather than a stale frame. -->
+      <main id="panel-body" class="panel-body">
+        <div id="list-view">
+          <!-- Rendered by render.js -->
+        </div>
+        <div id="settings-view" class="page" hidden></div>
+        <div id="help-view" class="page" hidden></div>
+      </main>
+
+      <!-- Telemetry line: present only while Stats is on. Written by render.js. -->
+      <footer id="telemetry" class="telemetry" hidden></footer>
+    </div>
+
+    <!-- Dialogs, menus and toasts render as siblings of .panel, never inside a
+         row. Two reasons, both load-bearing: a mid-flow servers:changed
+         re-render rebuilds #panel-body and would destroy anything living
+         inside it, and #panel-body is a scroll container, so an anchored
+         popover placed within it would be clipped at its edges. -->
+    <div id="overlay-root"></div>
+  </body>
+</html>
