@@ -113,8 +113,6 @@ const helpView = document.getElementById("help-view");
 const overlayRoot = document.getElementById("overlay-root");
 const refreshButton = document.getElementById("refresh-button");
 const statsToggle = document.getElementById("stats-toggle");
-const settingsButton = document.getElementById("settings-button");
-const helpButton = document.getElementById("help-button");
 const serverCount = document.getElementById("server-count");
 const telemetry = document.getElementById("telemetry");
 
@@ -122,8 +120,6 @@ const telemetry = document.getElementById("telemetry");
 // so icons.js stays the single place any Ant path data lives.
 refreshButton.appendChild(icon("reload", 13));
 statsToggle.appendChild(icon("dashboard", 13));
-settingsButton.appendChild(icon("setting", 13));
-helpButton.appendChild(icon("question-circle", 13));
 
 // ---------- Stats for nerds ----------
 // Read before the first paint so the panel never flashes friendly-then-dense.
@@ -202,7 +198,9 @@ function goBack() {
 }
 
 function openSettings() {
-  pageOpener = settingsButton;
+  // Opened from the tray menu, so there is no in-panel control to hand focus
+  // back to; goBack() already handles a null opener.
+  pageOpener = null;
   const focusTarget = renderSettings(settingsView, {
     theme: themeChoice,
     onThemeChange: (choice) => {
@@ -219,14 +217,26 @@ function openSettings() {
 }
 
 function openHelp() {
-  pageOpener = helpButton;
+  pageOpener = null;
   const focusTarget = renderHelp(helpView, { onBack: goBack });
   showView("help");
   focusTarget.focus();
 }
 
-settingsButton.addEventListener("click", openSettings);
-helpButton.addEventListener("click", openHelp);
+// Settings and Help open from the tray menu (lib.rs emits "navigate"; listener
+// in the __TAURI__ block below) — the user chose the menu bar over titlebar
+// buttons. ⌘, is the native Settings shortcut and ⌘? the native Help one; they
+// also keep both pages reachable in the browser mock, which has no tray.
+document.addEventListener("keydown", (e) => {
+  if (!(e.metaKey || e.ctrlKey)) return;
+  if (e.key === ",") {
+    e.preventDefault();
+    openSettings();
+  } else if (e.key === "?" || e.key === "/") {
+    e.preventDefault();
+    openHelp();
+  }
+});
 
 // Escape returns from a page — but only when nothing layered above it owns Escape.
 // A dialog or the source menu carries its own Escape handler, and closing the page
@@ -774,6 +784,18 @@ if (window.__TAURI__) {
       .onFocusChanged(({ payload: focused }) => setPanelVisible(focused));
   } catch (err) {
     console.warn("Tauri window focus listener unavailable:", err);
+  }
+
+  // The tray menu's "Settings…" and "Help" items (lib.rs) show the window and
+  // emit "navigate". Wrapped like the focus listener above: if the event API is
+  // absent the tray items still show the panel, and ⌘,/⌘? remain as the way in.
+  try {
+    window.__TAURI__.event.listen("navigate", ({ payload }) => {
+      if (payload === "settings") openSettings();
+      else if (payload === "help") openHelp();
+    });
+  } catch (err) {
+    console.warn("Tauri navigate listener unavailable:", err);
   }
 }
 

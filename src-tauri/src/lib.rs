@@ -136,14 +136,28 @@ pub fn run() {
             // ever shows it; without it the panel is unreachable and the app is just
             // a counter with a Quit button.
             let open = MenuItem::with_id(app, "open", "Open Portside", true, None::<&str>)?;
+            // Settings and Help live HERE, in the menu bar, not as titlebar buttons —
+            // the user's chosen home for them. Each shows the panel and tells the
+            // webview which page to open (the "navigate" event, src/main.js).
+            let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
+            let help = MenuItem::with_id(app, "help", "Help", true, None::<&str>)?;
+            let separator = tauri::menu::PredefinedMenuItem::separator(app)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open, &quit])?;
+            let menu = Menu::with_items(app, &[&open, &settings, &help, &separator, &quit])?;
 
             // F7: tray id "main" so commands::emit_snapshot can find it again after a
             // scan. Starts at "0" — the real count arrives with the loop's first
             // completed scan, typically within one PANEL_CLOSED cadence of startup.
+            // The menu bar mark is the user's clay-lighthouse silhouette as a macOS
+            // template image (pure black + alpha; the OS recolors it for light/dark
+            // bars and the pressed state). 44px = 22pt @2x, sharp on retina bars.
+            // Falls back to the window icon if the PNG ever fails to decode, because
+            // a tray app with no tray icon is unreachable.
+            let tray_icon = tauri::image::Image::from_bytes(include_bytes!("../icons/tray@2x.png"))
+                .unwrap_or_else(|_| app.default_window_icon().unwrap().clone());
             TrayIconBuilder::with_id("main")
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(tray_icon)
+                .icon_as_template(true)
                 .title("0")
                 .menu(&menu)
                 .on_menu_event(|app, event| match event.id.as_ref() {
@@ -156,6 +170,18 @@ pub fn run() {
                             let _ = window.show();
                             let _ = window.set_focus();
                         }
+                    }
+                    "settings" | "help" => {
+                        // Show first, then navigate: the event is only useful with
+                        // the panel visible, and emit is fire-and-forget — if the
+                        // webview is still booting and misses it, the user still
+                        // gets the panel (the graceful half of the feature).
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                        use tauri::Emitter;
+                        let _ = app.emit("navigate", event.id.as_ref());
                     }
                     "quit" => app.exit(0),
                     _ => {}

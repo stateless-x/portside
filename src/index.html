@@ -19,21 +19,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <h1 class="titlebar-title">Portside</h1>
         <span id="server-count" class="titlebar-count" aria-live="polite"></span>
 
+        <!-- Settings and Help open from the TRAY menu (src-tauri/src/lib.rs), not
+             from here — the user chose the menu bar as their home. The titlebar
+             keeps only the two controls that act on the list itself. -->
         <div class="titlebar-actions">
-          <button
-            id="settings-button"
-            class="titlebar-button"
-            type="button"
-            title="Settings"
-            aria-label="Settings"
-          ></button>
-          <button
-            id="help-button"
-            class="titlebar-button"
-            type="button"
-            title="Help"
-            aria-label="Help"
-          ></button>
           <button
             id="stats-toggle"
             class="titlebar-button"
