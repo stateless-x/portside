@@ -28,9 +28,9 @@ where a plain word and a technical word compete, the plain word wins).
 - "Keep Running" rows stay visible but recede.
 
 ## Brand commitments
-- Name: **Portside** (nautical: ports + at your side). Free, source-available
-  (PolyForm Noncommercial 1.0.0 — noncommercial use only; contact
-  askpurin@pm.me for commercial licensing).
+- Name: **Portside** (nautical: ports + at your side). Free and open source,
+  GPL-3.0 (user-chosen 2026-09-02 over MIT/Apache/PolyForm-NC: community-open,
+  but forks must stay open — no closed commercial clones).
 - Icons: **Ant Design icon set** (inline SVG; no framework dependency).
 - Frontend stays dependency-light: vanilla JS/CSS inside Tauri v2 webview,
   380×520-ish panel. IPC contract in docs/IPC.md changes only by recorded

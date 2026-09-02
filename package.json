@@ -10,6 +10,6 @@
     "@ant-design/icons-svg": "^4.6.0",
     "@tauri-apps/cli": "^2"
   },
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "GPL-3.0-only",
   "author": "Purin Buriwong <askpurin@pm.me>"
 }

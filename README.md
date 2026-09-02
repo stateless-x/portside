@@ -66,11 +66,10 @@ is shaped exactly like the IPC contract.
 
 ## Licence
 
-Portside is free to use and its source is open to read, under the
-[PolyForm Noncommercial 1.0.0](LICENSE) licence: use it, study it, fork it,
-improve it — for any noncommercial purpose. Selling Portside or building a
-commercial product on it is not permitted without a separate licence; if you
-want one, write to the address below.
+Portside is free and open source under the [GNU GPL-3.0](LICENSE)
+(© 2026 Purin Buriwong): use it anywhere, study it, fork it, improve it,
+even sell it — as long as whatever you distribute stays open source under
+the same licence. Closed-source forks are the one thing the licence forbids.
 
 Contributions and issues are welcome.
 
