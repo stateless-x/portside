@@ -45,6 +45,20 @@ The Rust/UI boundary is a frozen contract in [docs/IPC.md](docs/IPC.md).
 [CONTEXT.md](CONTEXT.md) defines every term the interface uses, and
 [REQUIREMENTS.md](REQUIREMENTS.md) says what the app must do and why.
 
+## Installing a downloaded build
+
+Portside is not yet notarized with Apple (that needs a paid developer
+account — see [Licence](#licence) for how this project is funded, which is
+to say: coffee). macOS will therefore warn that it "cannot verify the
+developer" the first time. To open it anyway: **right-click the app →
+Open → Open**, once. Or from a terminal:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/Portside.app
+```
+
+Building from source (below) avoids the warning entirely.
+
 ## Developing
 
 Requires Node and a Rust toolchain.
