@@ -1254,6 +1254,13 @@ body.tauri .telemetry {
   margin-bottom: 6px;
 }
 
+/* Expected asset: src/assets/lighthouse-mascot.png — 320×320 @2x, displayed 80×80,
+   centered above the Settings footer text. Decorative. */
+.asset-slot-mascot {
+  width: 80px;
+  margin: 0 auto 8px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .row-actions,
   .titlebar-button,

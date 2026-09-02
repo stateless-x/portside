@@ -104,6 +104,13 @@ export function emptyStateSlot() {
   return assetSlot("assets/empty-harbor.png", "", "asset-slot asset-slot-empty");
 }
 
+/** The lighthouse mascot, shown small above the Settings footer. Expected asset:
+ * src/assets/lighthouse-mascot.png, 320×320 @2x → 80×80 on screen. Decorative
+ * (empty alt): the footer text beside it carries all the information. */
+function mascotSlot() {
+  return assetSlot("assets/lighthouse-mascot.png", "", "asset-slot asset-slot-mascot");
+}
+
 // ---------- Shared page pieces ----------
 
 function el(tag, className, text) {
@@ -231,6 +238,7 @@ export function renderSettings(root, opts) {
 
   // --- Footer ---
   const footer = el("div", "page-footer");
+  footer.appendChild(mascotSlot());
   footer.appendChild(el("div", "footer-name", `${APP_NAME} ${APP_VERSION}`));
   footer.appendChild(el("div", "footer-note", "Portside never touches the network."));
   root.appendChild(footer);
